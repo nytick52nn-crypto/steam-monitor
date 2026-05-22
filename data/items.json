@@ -1,0 +1,14 @@
+[
+  {"name": "Fracture Case", "hash_name": "Fracture%20Case", "enabled": true, "priority": 1},
+  {"name": "Recoil Case", "hash_name": "Recoil%20Case", "enabled": true, "priority": 1},
+  {"name": "Revolution Case", "hash_name": "Revolution%20Case", "enabled": true, "priority": 1},
+  {"name": "Dreams & Nightmares Case", "hash_name": "Dreams%20%26%20Nightmares%20Case", "enabled": true, "priority": 1},
+  {"name": "Kilowatt Case", "hash_name": "Kilowatt%20Case", "enabled": true, "priority": 1},
+  {"name": "Spectrum 2 Case", "hash_name": "Spectrum%202%20Case", "enabled": true, "priority": 2},
+  {"name": "Prisma 2 Case", "hash_name": "Prisma%202%20Case", "enabled": true, "priority": 2},
+  {"name": "Clutch Case", "hash_name": "Clutch%20Case", "enabled": true, "priority": 2},
+  {"name": "Danger Zone Case", "hash_name": "Danger%20Zone%20Case", "enabled": true, "priority": 2},
+  {"name": "Glock-18 | Candy Apple (Field-Tested)", "hash_name": "Glock-18%20%7C%20Candy%20Apple%20%28Field-Tested%29", "enabled": true, "priority": 3},
+  {"name": "P250 | Sand Dune (Field-Tested)", "hash_name": "P250%20%7C%20Sand%20Dune%20%28Field-Tested%29", "enabled": true, "priority": 3},
+  {"name": "MAC-10 | Candy Apple (Field-Tested)", "hash_name": "MAC-10%20%7C%20Candy%20Apple%20%28Field-Tested%29", "enabled": true, "priority": 3}
+]

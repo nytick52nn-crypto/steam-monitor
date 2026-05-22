@@ -1,9 +1,11 @@
+import json
 import re
 import time
+from pathlib import Path
 
 from sqlalchemy.orm import Session
 
-from app.config import CHECK_INTERVAL_SEC
+from app.config import CHECK_INTERVAL_SEC, ITEMS_FILE
 from app.database import SessionLocal
 from app.logger import setup_logging
 from app.models import PriceHistory
@@ -12,13 +14,38 @@ from app.steam_api import get_priceoverview
 
 log = setup_logging("monitor")
 
-TEST_ITEMS = [
-    "AK-47 | Redline (Field-Tested)",
-    "AWP | Asiimov (Battle-Scarred)",
-    "Sticker | s1mple | Stockholm 2021",
+FALLBACK_ITEMS = [
+    {"name": "Fracture Case", "hash_name": "Fracture%20Case", "enabled": True, "priority": 1},
+    {"name": "Recoil Case", "hash_name": "Recoil%20Case", "enabled": True, "priority": 1},
+    {"name": "Revolution Case", "hash_name": "Revolution%20Case", "enabled": True, "priority": 1},
 ]
 
-CURRENCY_SUFFIXES = ("руб.", "pуб.", "руб", "₽", "$", "€", "USD", "EUR", "RUB")
+CURRENCY_SUFFIXES = ("\u0440\u0443\u0431.", "p\u0443\u0431.", "\u0440\u0443\u0431", "\u20bd", "$", "\u20ac", "USD", "EUR", "RUB")
+
+
+def load_items(path: str = ITEMS_FILE) -> list[dict]:
+    """Load tracked items from JSON file, filtering enabled and sorting by priority."""
+    items_path = Path(path)
+    if not items_path.exists():
+        log.warning("Items file not found: %s — using %d fallback items", path, len(FALLBACK_ITEMS))
+        return list(FALLBACK_ITEMS)
+
+    try:
+        with open(items_path, encoding="utf-8") as f:
+            raw = json.load(f)
+    except (json.JSONDecodeError, OSError) as exc:
+        log.warning("Failed to read items file %s: %s — using %d fallback items", path, exc, len(FALLBACK_ITEMS))
+        return list(FALLBACK_ITEMS)
+
+    if not isinstance(raw, list) or not raw:
+        log.warning("Items file %s is empty or not a list — using %d fallback items", path, len(FALLBACK_ITEMS))
+        return list(FALLBACK_ITEMS)
+
+    enabled = [item for item in raw if item.get("enabled", True)]
+    enabled.sort(key=lambda x: x.get("priority", 999))
+
+    log.info("Loaded %d items from %s (%d total, %d enabled)", len(enabled), path, len(raw), len(enabled))
+    return enabled
 
 
 def parse_price(price_text: str) -> float | None:
@@ -84,56 +111,59 @@ def save_price(item_name: str, price: float, volume: int) -> bool:
             db.close()
 
 
-def process_item(item: str) -> bool:
-    log.info("Fetching: %s", item)
-    data = get_priceoverview(item)
+def process_item(item: dict) -> bool:
+    item_name = item["name"]
+    hash_name = item.get("hash_name", item_name)
+    log.info("Fetching: %s", item_name)
+    data = get_priceoverview(hash_name)
 
     if not data:
-        log.warning("No data returned for: %s", item)
+        log.warning("No data returned for: %s", item_name)
         return False
 
     lowest_price = data.get("lowest_price") or data.get("median_price")
     if not lowest_price:
-        log.warning("No price in response for: %s | data=%s", item, data)
+        log.warning("No price in response for: %s | data=%s", item_name, data)
         return False
 
     price = parse_price(lowest_price)
     if price is None:
-        log.warning("Price parse failed for %s: %r", item, lowest_price)
+        log.warning("Price parse failed for %s: %r", item_name, lowest_price)
         return False
 
     volume = parse_volume(data.get("volume", 0))
-    saved = save_price(item_name=item, price=price, volume=volume)
+    saved = save_price(item_name=item_name, price=price, volume=volume)
 
     if saved:
         median_raw = data.get("median_price")
         median_price = parse_price(median_raw) if median_raw else None
         signal = evaluate_and_notify(
-            item_name=item,
+            item_name=item_name,
             current_price=price,
             volume=volume,
             median_price=median_price,
         )
         if signal:
-            log.info("Signal for %s: %s", item, signal)
+            log.info("Signal for %s: %s", item_name, signal)
 
     return saved
 
 
 def run_monitor() -> None:
-    log.info("Monitor started. Items=%d, interval=%ds", len(TEST_ITEMS), CHECK_INTERVAL_SEC)
+    items = load_items()
+    log.info("Monitor started. Items=%d, interval=%ds", len(items), CHECK_INTERVAL_SEC)
 
     while True:
         log.info("--- Scan cycle started ---")
         saved = 0
 
-        for item in TEST_ITEMS:
+        for item in items:
             try:
                 if process_item(item):
                     saved += 1
             except Exception as exc:
-                log.exception("Unexpected error for %s: %s", item, exc)
+                log.exception("Unexpected error for %s: %s", item.get("name", item), exc)
 
-        log.info("Scan complete: %d/%d items saved", saved, len(TEST_ITEMS))
+        log.info("Scan complete: %d/%d items saved", saved, len(items))
         log.info("Sleeping %d seconds...", CHECK_INTERVAL_SEC)
         time.sleep(CHECK_INTERVAL_SEC)
