@@ -9,7 +9,8 @@ import streamlit as st
 # Allow imports from project root when Streamlit runs web/dashboard.py
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.paper_trading import get_open_positions, get_closed_positions
+from app.config import STEAM_MARKET_FEE_PCT
+from app.paper_trading import get_closed_positions, get_open_positions
 from app.wallet import (
     InsufficientBalanceError,
     deposit,
@@ -30,33 +31,34 @@ st.title("Steam Market Monitor")
 st.caption("Live prices from Steam Community Market API")
 
 
+def _total_closed_pnl() -> float:
+    """Sum of realized PnL across all closed positions."""
+    closed = get_closed_positions()
+    return sum(p["pnl_rub"] for p in closed if p["pnl_rub"] is not None)
+
+
 def render_wallet_section() -> None:
     st.subheader("Virtual wallet")
     snap = get_wallet_snapshot()
-    pnl = snap["pnl_placeholder"]
-    pnl_delta = f"{pnl:+.2f} ₽" if pnl != 0 else "0.00 ₽"
+    realized_pnl = _total_closed_pnl()
+    pnl_delta = f"{realized_pnl:+.2f} \u20bd" if realized_pnl != 0 else "0.00 \u20bd"
 
-    closed_positions = get_closed_positions()
-    realized_pnl = sum(float(p.get("pnl_rub") or 0) for p in closed_positions)
-
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Current balance", f"{snap['balance']:,.2f} ₽".replace(",", " "))
-    col2.metric("Starting balance", f"{snap['starting_balance']:,.2f} ₽".replace(",", " "))
-    col3.metric("Realized PnL", f"{realized_pnl:+,.2f} ₽".replace(",", " "))
-    col4.metric("Total PnL", f"{pnl:+,.2f} ₽".replace(",", " "), delta=pnl_delta)
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Current balance", f"{snap['balance']:,.2f} \u20bd".replace(",", " "))
+    col2.metric("Starting balance", f"{snap['starting_balance']:,.2f} \u20bd".replace(",", " "))
+    col3.metric("Total PnL (realized)", f"{realized_pnl:,.2f} \u20bd".replace(",", " "), delta=pnl_delta)
     st.caption(
-        "Paper wallet — Realized PnL from closed trades. "
-        "Total PnL = current balance − starting balance."
+        "Paper wallet \u2014 Total PnL shows sum of realized profits from closed positions."
     )
 
     with st.expander("Adjust balance (testing)"):
         c1, c2, c3 = st.columns([2, 2, 1])
-        amount = c1.number_input("Amount (₽)", min_value=0.01, value=100.0, step=10.0)
+        amount = c1.number_input("Amount (\u20bd)", min_value=0.01, value=100.0, step=10.0)
         note = c2.text_input("Note", value="")
         if c3.button("Deposit"):
             try:
                 deposit(amount, note=note)
-                st.success(f"Deposited {amount:.2f} ₽")
+                st.success(f"Deposited {amount:.2f} \u20bd")
                 st.cache_data.clear()
                 st.rerun()
             except ValueError as exc:
@@ -64,7 +66,7 @@ def render_wallet_section() -> None:
         if c3.button("Withdraw"):
             try:
                 withdraw(amount, note=note)
-                st.success(f"Withdrew {amount:.2f} ₽")
+                st.success(f"Withdrew {amount:.2f} \u20bd")
                 st.cache_data.clear()
                 st.rerun()
             except InsufficientBalanceError as exc:
@@ -73,9 +75,9 @@ def render_wallet_section() -> None:
                 st.error(str(exc))
 
 
-@st.cache_data(ttl=10)
-def get_latest_prices() -> dict:
-    """Get latest price for each item from price_history."""
+@st.cache_data(ttl=30)
+def _load_latest_prices() -> dict[str, float]:
+    """Load latest price per item from DB for unrealized PnL calculation."""
     if not DB_PATH.exists():
         return {}
 
@@ -84,7 +86,8 @@ def get_latest_prices() -> dict:
     conn = sqlite3.connect(DB_PATH)
     try:
         df = pd.read_sql(
-            "SELECT item_name, price FROM price_history ORDER BY created_at DESC",
+            "SELECT item_name, price FROM price_history "
+            "WHERE id IN (SELECT MAX(id) FROM price_history GROUP BY item_name)",
             conn,
         )
     finally:
@@ -92,8 +95,7 @@ def get_latest_prices() -> dict:
 
     if df.empty:
         return {}
-
-    return df.drop_duplicates(subset=["item_name"], keep="first").set_index("item_name")["price"].to_dict()
+    return dict(zip(df["item_name"], df["price"]))
 
 
 def render_open_positions_section() -> None:
@@ -103,65 +105,81 @@ def render_open_positions_section() -> None:
         st.info("No open paper positions. BUY signals open positions when balance allows.")
         return
 
-    latest_prices = get_latest_prices()
-    fee_net_pct = 0.85
+    latest_prices = _load_latest_prices()
+    fee_mult = 1 - STEAM_MARKET_FEE_PCT / 100.0
 
     df = pd.DataFrame(positions)
     df["opened_at"] = pd.to_datetime(df["opened_at"], errors="coerce")
 
-    df["current_price"] = df["item_name"].map(lambda x: latest_prices.get(x, None))
+    df["current_price"] = df["item_name"].map(latest_prices)
     df["unrealized_pnl"] = df.apply(
-        lambda row: (row["current_price"] - row["entry_price"]) * fee_net_pct * row["quantity"]
-        if row["current_price"] is not None
+        lambda r: round(
+            (r["current_price"] * fee_mult - r["entry_price"]) * r["quantity"], 2
+        )
+        if pd.notna(r.get("current_price"))
         else None,
         axis=1,
     )
 
     display = df[
-        ["item_name", "entry_price", "current_price", "quantity", "cost", "unrealized_pnl", "signal", "opened_at", "status"]
+        ["item_name", "entry_price", "current_price", "unrealized_pnl",
+         "quantity", "cost", "signal", "opened_at", "status"]
     ].copy()
     display.columns = [
         "Item",
-        "Entry (₽)",
-        "Current (₽)",
+        "Entry (\u20bd)",
+        "Current (\u20bd)",
+        "Unrealized PnL (\u20bd)",
         "Qty",
-        "Cost (₽)",
-        "Unrealized PnL (₽)",
+        "Cost (\u20bd)",
         "Signal",
         "Opened (UTC)",
         "Status",
     ]
     st.dataframe(display, use_container_width=True, hide_index=True)
-    st.caption(f"{len(positions)} open position(s). SELL signals close positions and realize PnL.")
+
+    total_unrealized = df["unrealized_pnl"].dropna().sum()
+    st.caption(
+        f"{len(positions)} open position(s). "
+        f"Total unrealized PnL: {total_unrealized:+.2f} \u20bd (after {STEAM_MARKET_FEE_PCT:.0f}% fee)"
+    )
 
 
 def render_closed_positions_section() -> None:
     st.subheader("Closed positions (paper)")
-    positions = get_closed_positions()
-    if not positions:
-        st.info("No closed positions yet. Closed trades will appear here.")
+    closed = get_closed_positions()
+    if not closed:
+        st.info("No closed positions yet. SELL signals will close open positions.")
         return
 
-    df = pd.DataFrame(positions)
+    df = pd.DataFrame(closed)
+    df["opened_at"] = pd.to_datetime(df["opened_at"], errors="coerce")
     df["closed_at"] = pd.to_datetime(df["closed_at"], errors="coerce")
 
     display = df[
-        ["item_name", "entry_price", "exit_price", "quantity", "pnl_rub", "pnl_pct", "closed_at", "status"]
+        ["item_name", "entry_price", "exit_price", "pnl_rub", "pnl_pct",
+         "quantity", "opened_at", "closed_at"]
     ].copy()
     display.columns = [
         "Item",
-        "Entry (₽)",
-        "Exit (₽)",
-        "Qty",
-        "PnL (₽)",
+        "Entry (\u20bd)",
+        "Exit (\u20bd)",
+        "PnL (\u20bd)",
         "PnL (%)",
+        "Qty",
+        "Opened (UTC)",
         "Closed (UTC)",
-        "Status",
     ]
-
     st.dataframe(display, use_container_width=True, hide_index=True)
-    total_pnl = df["pnl_rub"].sum()
-    st.caption(f"{len(positions)} closed position(s). Total realized PnL: {total_pnl:+,.2f} ₽".replace(",", " "))
+
+    total_pnl = sum(p["pnl_rub"] for p in closed if p["pnl_rub"] is not None)
+    wins = sum(1 for p in closed if p["pnl_rub"] is not None and p["pnl_rub"] > 0)
+    win_rate = (wins / len(closed) * 100) if closed else 0
+
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Total realized PnL", f"{total_pnl:+.2f} \u20bd")
+    c2.metric("Trades", str(len(closed)))
+    c3.metric("Win rate", f"{win_rate:.0f}%")
 
 
 @st.cache_data(ttl=30)
@@ -197,8 +215,8 @@ def render_metrics(df: pd.DataFrame) -> None:
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Tracked items", df["item_name"].nunique())
     col2.metric("Total records", len(df))
-    col3.metric("Latest price (avg)", f"{latest['price'].mean():.2f} ₽" if not latest.empty else "—")
-    col4.metric("Last update", df["created_at"].max().strftime("%H:%M:%S") if not df.empty else "—")
+    col3.metric("Latest price (avg)", f"{latest['price'].mean():.2f} \u20bd" if not latest.empty else "\u2014")
+    col4.metric("Last update", df["created_at"].max().strftime("%H:%M:%S") if not df.empty else "\u2014")
 
 
 def render_chart(card_df: pd.DataFrame, item_name: str) -> None:
@@ -212,8 +230,8 @@ def render_chart(card_df: pd.DataFrame, item_name: str) -> None:
         x="created_at",
         y="price",
         markers=True,
-        title=f"{item_name} — price history (₽)",
-        labels={"created_at": "Time", "price": "Price (₽)"},
+        title=f"{item_name} \u2014 price history (\u20bd)",
+        labels={"created_at": "Time", "price": "Price (\u20bd)"},
     )
     fig.update_layout(hovermode="x unified")
     st.plotly_chart(fig, use_container_width=True)
@@ -235,7 +253,7 @@ df = load_prices()
 
 if df.empty:
     st.warning(
-        "No price history yet. The monitor is collecting data — "
+        "No price history yet. The monitor is collecting data \u2014 "
         "check back in about a minute after the first scan cycle."
     )
     st.info(f"Database path: `{DB_PATH.resolve()}`")
@@ -262,7 +280,7 @@ render_chart(card_df, selected)
 
 latest_row = card_df.sort_values("created_at").iloc[-1]
 st.write(
-    f"**Latest:** {latest_row['price']:.2f} ₽ | "
+    f"**Latest:** {latest_row['price']:.2f} \u20bd | "
     f"**Volume:** {int(latest_row['volume'])} | "
     f"**At:** {latest_row['created_at']}"
 )

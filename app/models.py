@@ -40,7 +40,7 @@ class Wallet(Base):
 
 
 class OpenPosition(Base):
-    """Paper trade position with BUY entry and SELL exit tracking."""
+    """Paper trade position (BUY \u2192 SELL with full PnL tracking)."""
 
     __tablename__ = "open_positions"
 
