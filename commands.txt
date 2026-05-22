@@ -1,0 +1,24 @@
+# Build and run
+docker compose up --build -d
+
+# Follow logs (monitor + dashboard)
+docker compose logs -f
+
+# Stop
+docker compose down
+
+# Dashboard: http://localhost:8501
+# Logs on host: ./logs/monitor.log
+# Database: ./data/steam_cards.db
+
+# Telegram setup:
+# 1. Create bot via @BotFather -> copy token to TELEGRAM_BOT_TOKEN
+# 2. Get chat id via @userinfobot -> copy to TELEGRAM_CHAT_ID
+# 3. Set TELEGRAM_VALIDATE_SIGNALS=true once, rebuild, check Telegram
+# 4. Set TELEGRAM_VALIDATE_SIGNALS=false for normal operation
+
+# Validate Telegram only:
+# docker exec steam-monitor python scripts/validate_telegram.py
+
+# Validate wallet:
+# docker exec steam-monitor python scripts/validate_wallet.py

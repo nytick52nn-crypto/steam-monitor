@@ -1,0 +1,8 @@
+# В корне проекта создай файл .gitignore
+.env
+data/
+logs/
+charts/
+__pycache__/
+*.pyc
+*.db

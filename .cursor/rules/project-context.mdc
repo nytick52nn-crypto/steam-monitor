@@ -1,0 +1,27 @@
+---
+description: Keep PROJECT_CONTEXT.md in sync after major project changes
+alwaysApply: true
+---
+
+# Project context documentation
+
+After **major changes** to steam-monitor, update `PROJECT_CONTEXT.md` in the same work session (same PR/commit when applicable).
+
+## What counts as major
+
+- New or removed modules under `app/`, `web/`, `scripts/`
+- SQLite schema changes (`app/models.py`)
+- New/changed environment variables (`app/config.py`, `.env.example`)
+- Docker / compose / Dockerfile workflow changes
+- Telegram alert flow, signal engine rules, or dashboard features
+- Roadmap items completed or new known issues discovered
+
+## What to update
+
+Edit the relevant sections: architecture, folder structure, Docker, schema, Telegram logic, signals, dashboard, env vars, commands, roadmap, known issues, trading strategy.
+
+Bump the **Last updated** date at the top of `PROJECT_CONTEXT.md`.
+
+## What to skip
+
+- Typo fixes, small refactors, or comment-only changes that do not change behavior or structure.
