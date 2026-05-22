@@ -40,7 +40,7 @@ class Wallet(Base):
 
 
 class OpenPosition(Base):
-    """Paper trade position (BUY only until SELL is implemented)."""
+    """Paper trade position (BUY → SELL with full PnL tracking)."""
 
     __tablename__ = "open_positions"
 
@@ -53,3 +53,7 @@ class OpenPosition(Base):
     status = Column(String, index=True, default="open")
     signal = Column(String, default="BUY")
     opened_at = Column(DateTime, default=datetime.utcnow, index=True)
+    exit_price = Column(Float, nullable=True)
+    closed_at = Column(DateTime, nullable=True)
+    pnl_rub = Column(Float, nullable=True)
+    pnl_pct = Column(Float, nullable=True)

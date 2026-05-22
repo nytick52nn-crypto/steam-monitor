@@ -1,18 +1,19 @@
-"""Paper BUY execution: open positions backed by the virtual wallet."""
+"""Paper trading: BUY → SELL with full PnL tracking, backed by virtual wallet."""
 
 from datetime import datetime
 
 from sqlalchemy.orm import Session
 
-from app.config import MAX_POSITION_PCT, PAPER_TRADING_ENABLED
+from app.config import MAX_POSITION_PCT, PAPER_TRADING_ENABLED, STEAM_MARKET_FEE_PCT
 from app.database import SessionLocal
 from app.logger import setup_logging
 from app.models import OpenPosition
-from app.wallet import InsufficientBalanceError, get_balance, withdraw
+from app.wallet import InsufficientBalanceError, deposit, get_balance, withdraw
 
 log = setup_logging("paper_trading")
 
 POSITION_STATUS_OPEN = "open"
+POSITION_STATUS_CLOSED = "closed"
 
 
 def max_position_cost(balance: float) -> float:
@@ -60,6 +61,35 @@ def get_open_positions() -> list[dict]:
                 "status": r.status,
                 "signal": r.signal,
                 "opened_at": r.opened_at,
+            }
+            for r in rows
+        ]
+    finally:
+        db.close()
+
+
+def get_closed_positions() -> list[dict]:
+    """Return all closed positions ordered by close time (newest first)."""
+    db = SessionLocal()
+    try:
+        rows = (
+            db.query(OpenPosition)
+            .filter(OpenPosition.status == POSITION_STATUS_CLOSED)
+            .order_by(OpenPosition.closed_at.desc())
+            .all()
+        )
+        return [
+            {
+                "id": r.id,
+                "item_name": r.item_name,
+                "entry_price": float(r.entry_price),
+                "exit_price": float(r.exit_price) if r.exit_price is not None else None,
+                "quantity": float(r.quantity),
+                "cost": float(r.cost),
+                "pnl_rub": float(r.pnl_rub) if r.pnl_rub is not None else None,
+                "pnl_pct": float(r.pnl_pct) if r.pnl_pct is not None else None,
+                "opened_at": r.opened_at,
+                "closed_at": r.closed_at,
             }
             for r in rows
         ]
@@ -142,6 +172,83 @@ def execute_paper_buy(
             get_balance(),
         )
         return position
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
+def execute_paper_sell(
+    item_name: str,
+    current_price: float,
+    fee_pct: float = STEAM_MARKET_FEE_PCT,
+) -> dict | None:
+    """
+    Close an open paper position on SELL: calculate PnL, deposit net revenue,
+    update position in SQLite.
+
+    Returns a trade summary dict, or None if no open position was found.
+    """
+    if not PAPER_TRADING_ENABLED:
+        log.debug("Paper trading disabled, skipping SELL for %s", item_name)
+        return None
+
+    if current_price <= 0:
+        log.warning("Invalid SELL price for %s: %s", item_name, current_price)
+        return None
+
+    db = SessionLocal()
+    try:
+        position = (
+            db.query(OpenPosition)
+            .filter(
+                OpenPosition.item_name == item_name,
+                OpenPosition.status == POSITION_STATUS_OPEN,
+            )
+            .first()
+        )
+
+        if position is None:
+            log.warning("Paper SELL skipped %s: no open position found", item_name)
+            return None
+
+        quantity = float(position.quantity)
+        entry_price = float(position.entry_price)
+
+        net_revenue = current_price * (1 - fee_pct / 100.0)
+        pnl_rub = round((net_revenue - entry_price) * quantity, 2)
+        pnl_pct = round((pnl_rub / (entry_price * quantity)) * 100, 2) if entry_price > 0 else 0.0
+
+        position.status = POSITION_STATUS_CLOSED
+        position.exit_price = current_price
+        position.closed_at = datetime.utcnow()
+        position.pnl_rub = pnl_rub
+        position.pnl_pct = pnl_pct
+
+        deposit_amount = round(net_revenue * quantity, 2)
+        deposit(deposit_amount, note=f"paper SELL {item_name}")
+
+        db.commit()
+
+        log.info(
+            "Paper SELL closed id=%s %s @ %.2f pnl=%.2f₽ (%.1f%%) balance_after=%.2f",
+            position.id,
+            item_name,
+            current_price,
+            pnl_rub,
+            pnl_pct,
+            get_balance(),
+        )
+
+        return {
+            "item_name": item_name,
+            "entry_price": entry_price,
+            "exit_price": current_price,
+            "pnl_rub": pnl_rub,
+            "pnl_pct": pnl_pct,
+            "quantity": quantity,
+        }
     except Exception:
         db.rollback()
         raise

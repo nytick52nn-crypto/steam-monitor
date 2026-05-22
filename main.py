@@ -43,10 +43,11 @@ def main() -> None:
     try:
         ensure_directories()
 
-        from app.database import engine
+        from app.database import engine, migrate_open_positions
         from app.models import Base
 
         Base.metadata.create_all(bind=engine)
+        migrate_open_positions()
         log.info("Database ready at %s", DATA_DIR / "steam_cards.db")
 
         from app.wallet import init_wallet

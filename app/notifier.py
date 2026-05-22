@@ -178,6 +178,40 @@ def send_startup_test() -> bool:
     return ok
 
 
+def send_sell_alert(trade: dict) -> bool:
+    """Send a Telegram alert for a closed paper trade."""
+    if not is_telegram_configured():
+        log.debug("Telegram not configured, skipping sell alert for %s", trade.get("item_name"))
+        return False
+
+    from app.wallet import get_balance
+
+    balance = get_balance()
+    pnl_sign = "+" if trade["pnl_rub"] >= 0 else ""
+    text = (
+        "\U0001f534 <b>ЗАКРЫТО:</b> {item_name}\n"
+        "Вход: {entry:.0f}₽ → Выход: {exit:.0f}₽\n"
+        "PnL: {pnl_sign}{pnl_rub:.0f}₽ ({pnl_sign}{pnl_pct:.1f}%)\n"
+        "Баланс: {balance:.0f}₽"
+    ).format(
+        item_name=trade["item_name"],
+        entry=trade["entry_price"],
+        exit=trade["exit_price"],
+        pnl_sign=pnl_sign,
+        pnl_rub=trade["pnl_rub"],
+        pnl_pct=trade["pnl_pct"],
+        balance=balance,
+    )
+
+    log.info("Sending Telegram SELL close alert for %s", trade["item_name"])
+    ok = send_raw_message(text)
+    if ok:
+        log.info("Telegram SELL close alert for %s: DELIVERED", trade["item_name"])
+    else:
+        log.error("Telegram SELL close alert for %s: FAILED", trade["item_name"])
+    return ok
+
+
 def send_signal_alert(
     signal: str,
     item_name: str,
