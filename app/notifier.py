@@ -108,6 +108,24 @@ def format_sell_alert(
     )
 
 
+def format_sell_closed(trade: dict) -> str:
+    entry_price = trade["entry_price"]
+    exit_price = trade["exit_price"]
+    pnl_rub = trade["pnl_rub"]
+    pnl_pct = trade["pnl_pct"]
+    item_name = trade["item_name"]
+
+    pnl_sign = "+" if pnl_rub >= 0 else ""
+    pnl_sign_pct = "+" if pnl_pct >= 0 else ""
+
+    return (
+        "🔴 <b>ЗАКРЫТО</b>\n\n"
+        f"<b>{item_name}</b>\n"
+        f"Вход: {_fmt_money(entry_price)} ₽ → Выход: {_fmt_money(exit_price)} ₽\n"
+        f"PnL: <b>{pnl_sign}{_fmt_money(pnl_rub)} ₽</b> ({pnl_sign_pct}{pnl_pct:.1f}%)"
+    )
+
+
 async def _send_message_async(text: str) -> bool:
     bot = _build_bot()
 
@@ -204,4 +222,27 @@ def send_signal_alert(
         log.info("Telegram %s alert for %s: DELIVERED", signal, item_name)
     else:
         log.error("Telegram %s alert for %s: FAILED", signal, item_name)
+    return ok
+
+
+def send_sell_alert(
+    item_name: str,
+    trade: dict | None,
+    chart_path: Path | None = None,
+) -> bool:
+    if not is_telegram_configured():
+        log.debug("Telegram not configured, skipping trade closure alert for %s", item_name)
+        return False
+
+    if not trade:
+        log.warning("No trade data for sell alert %s", item_name)
+        return False
+
+    text = format_sell_closed(trade)
+    log.info("Sending Telegram trade closure alert for %s (chart=%s)", item_name, chart_path)
+    ok = asyncio.run(_send_alert_async(text, chart_path))
+    if ok:
+        log.info("Telegram trade closure alert for %s: DELIVERED", item_name)
+    else:
+        log.error("Telegram trade closure alert for %s: FAILED", item_name)
     return ok

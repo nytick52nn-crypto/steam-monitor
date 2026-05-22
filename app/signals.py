@@ -12,8 +12,8 @@ from app.database import SessionLocal
 from app.indicators import add_indicators
 from app.logger import setup_logging
 from app.models import PriceHistory
-from app.notifier import is_telegram_configured, send_signal_alert
-from app.paper_trading import execute_paper_buy, has_open_position, get_open_positions
+from app.notifier import is_telegram_configured, send_signal_alert, send_sell_alert
+from app.paper_trading import execute_paper_buy, execute_paper_sell, has_open_position, get_open_positions
 from app.roi import calc_buy_metrics, calc_sell_metrics
 from app.trading_engine import get_detailed_trade_signal
 
@@ -120,6 +120,16 @@ def evaluate_and_notify(
         if position:
             log.info("Paper position opened for %s (id=%s)", item_name, position.id)
 
+    trade = None
+    if signal == "SELL":
+        db = SessionLocal()
+        try:
+            trade = execute_paper_sell(item_name, current_price, session=db)
+            if trade:
+                log.info("Paper position closed for %s (id=%s)", item_name, trade["id"])
+        finally:
+            db.close()
+
     if not is_telegram_configured():
         return signal
 
@@ -135,15 +145,24 @@ def evaluate_and_notify(
 
     chart_path = save_signal_chart(df, item_name, signal, CHARTS_DIR)
 
-    if send_signal_alert(
-        signal=signal,
-        item_name=item_name,
-        price=current_price,
-        rsi=rsi,
-        metrics=metrics,
-        volume=volume,
-        chart_path=chart_path,
-    ):
+    if signal == "BUY":
+        success = send_signal_alert(
+            signal=signal,
+            item_name=item_name,
+            price=current_price,
+            rsi=rsi,
+            metrics=metrics,
+            volume=volume,
+            chart_path=chart_path,
+        )
+    else:
+        success = send_sell_alert(
+            item_name=item_name,
+            trade=trade,
+            chart_path=chart_path,
+        ) if trade else False
+
+    if success:
         record_alert(item_name, signal)
         log.info("Alert recorded: %s %s", item_name, signal)
 

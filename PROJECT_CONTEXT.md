@@ -54,14 +54,13 @@ Build a reliable semi-automated trading tool for the Steam Market that helps gen
 - Steam Market Price Overview API client (`steam_api.py`)
 - Technical indicators (RSI, EMA20, Bollinger Bands)
 - Basic monitoring loop (`monitor.py`)
-- Paper Trading (BUY only)
+- Paper Trading (BUY + SELL + full PnL tracking)
 - Telegram notifications with chart images
 - Streamlit dashboard (`web/dashboard.py`)
 - Basic logging and configuration system
 
 **In Progress / High Priority:**
 - Full implementation of new "High-Quality Rare Trades" strategy
-- Complete Paper Trading (SELL + full PnL tracking)
 - Advanced signal filters and profit calculation
 - Smart Item management (`items.json` + scoring)
 - Risk management & position sizing module
@@ -159,7 +158,7 @@ text
 ## Next Development Steps (Priority)
 
 1. ~~Update trading strategy with new strict filters (Prompt 1)~~ ✅ Done
-2. Implement full Paper SELL + improved PnL tracking (Prompt 2)
+2. ~~Implement full Paper SELL + improved PnL tracking (Prompt 2)~~ ✅ Done
 3. Smart items management + `items.json` (Prompt 3)
 4. Risk management module (`app/risk.py`)
 5. Enhanced dashboard with statistics and indicators
@@ -169,4 +168,4 @@ text
 ---
 
 **Last Updated:** May 22, 2026  
-**Project Phase:** High-Quality Mean Reversion Strategy (Prompt 1 implemented)
+**Project Phase:** Paper SELL Implementation (Prompt 2 complete)
