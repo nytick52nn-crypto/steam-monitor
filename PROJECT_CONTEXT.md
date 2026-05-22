@@ -159,7 +159,7 @@ text
 
 1. ~~Update trading strategy with new strict filters (Prompt 1)~~ ✅ Done
 2. ~~Implement full Paper SELL + improved PnL tracking (Prompt 2)~~ ✅ Done
-3. Smart items management + `items.json` (Prompt 3)
+3. ~~Smart items management + `items.json` (Prompt 3)~~ ✅ Done
 4. Risk management module (`app/risk.py`)
 5. Enhanced dashboard with statistics and indicators
 6. Statistics collection + weekly Telegram reports
@@ -168,4 +168,4 @@ text
 ---
 
 **Last Updated:** May 22, 2026  
-**Project Phase:** Paper SELL Implementation (Prompt 2 complete)
+**Project Phase:** Smart Items Management (Prompts 1–3 implemented)

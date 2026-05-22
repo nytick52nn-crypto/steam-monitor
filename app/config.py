@@ -88,6 +88,9 @@ MAX_PRICE_RUB = float(os.getenv("MAX_PRICE_RUB", 2500))
 STEAM_REQUEST_DELAY_MIN = float(os.getenv("STEAM_REQUEST_DELAY_MIN", 2))
 STEAM_REQUEST_DELAY_MAX = float(os.getenv("STEAM_REQUEST_DELAY_MAX", 5))
 
+# Items file (list of tracked market items)
+ITEMS_FILE = os.getenv("ITEMS_FILE", "data/items.json")
+
 # Virtual wallet (paper trading balance, no real Steam funds)
 WALLET_INITIAL_BALANCE = float(os.getenv("WALLET_INITIAL_BALANCE", 10000))
 
