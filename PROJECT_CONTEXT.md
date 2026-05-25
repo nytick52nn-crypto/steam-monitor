@@ -74,6 +74,13 @@ Build a reliable semi-automated trading tool for the Steam Market that helps gen
 
 ## Architecture Overview
 
+### Docker
+
+Two services: **dashboard** (bridge network, port 8501) + **monitor** (host network, bypasses Steam IP blocks).
+
+- `dashboard`: Streamlit UI, published on `8501:8501`, shared volumes for `data/`, `logs/`, `charts/`.
+- `monitor`: `network_mode: host`, runs `python main.py` for Steam API polling using the host network stack.
+
 **Main Components:**
 - `main.py` → Entry point (starts dashboard and/or monitor)
 - `app/` → Core business logic
@@ -158,6 +165,13 @@ text
 
 ---
 
+## Known Issues / Bugs
+
+### Fixed Issues:
+- ✅ **FIXED: Docker container SSL timeout on steamcommunity.com**
+- **Root cause:** Steam blocks virtual/NAT IPs from Docker
+- **Solution:** monitor service uses `network_mode: host`
+
 ## Known Issues / Fixes (May 2026)
 
 ### Fixed Issues:
@@ -170,6 +184,12 @@ text
 - **STEAM_REQUEST_DELAY_MIN/MAX:** Set to 10–20 seconds to avoid Steam 429 bans
 - **429 Handling:** Bot will wait exponentially (60s, 120s, 180s) and retry on rate limit
 - **Price Source:** Steam API returns median_price for most items, lowest_price rarely. Logic now prioritizes median_price.
+
+---
+
+## Known Limitations
+
+- `network_mode: host` only works on Linux Docker. On Windows/Mac Docker Desktop: use `host.docker.internal` OR run `python main.py` directly on the Windows host.
 
 ---
 
@@ -193,8 +213,10 @@ text
 7. Enhanced dashboard with statistics and indicators
 8. Statistics collection + weekly Telegram reports
 9. State persistence and graceful shutdown
+10. ✅ Docker network fix for Steam API access
+11. ✅ Steam API headers updated
 
 ---
 
 **Last Updated:** May 25, 2026  
-**Project Phase:** Steam API fixed, price parsing working
+**Project Phase:** Docker network fixed, Steam API headers corrected

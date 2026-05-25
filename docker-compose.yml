@@ -1,27 +1,23 @@
 services:
-  steam-monitor:
+  dashboard:
     build: .
-    container_name: steam-monitor
-    restart: unless-stopped
-
-    env_file:
-      - .env
-
-    environment:
-      - DATA_DIR=/app/data
-      - DATABASE_URL=sqlite:////app/data/steam_cards.db
-
-    volumes:
-      - ./data:/app/data
-      - ./charts:/app/charts
-      - ./logs:/app/logs
-
     ports:
       - "8501:8501"
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./charts:/app/charts
+    env_file: .env
+    command: streamlit run web/dashboard.py --server.port 8501
+    restart: unless-stopped
 
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8501/_stcore/health')"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 45s
+  monitor:
+    build: .
+    network_mode: host
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./charts:/app/charts
+    env_file: .env
+    command: python main.py
+    restart: unless-stopped
