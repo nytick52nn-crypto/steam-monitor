@@ -46,30 +46,28 @@ Build a reliable semi-automated trading tool for the Steam Market that helps gen
 
 ---
 
-## Current Status (as of May 22, 2026)
+## Current Status (as of May 25, 2026)
 
-**Completed:**
-- Core project architecture and folder structure
-- SQLite database with SQLAlchemy
-- Steam Market Price Overview API client (`steam_api.py`)
-- Technical indicators (RSI, EMA20, Bollinger Bands)
-- Basic monitoring loop (`monitor.py`)
-- Paper Trading (BUY + SELL + full PnL tracking)
-- Telegram notifications with chart images
-- Streamlit dashboard (`web/dashboard.py`)
-- Basic logging and configuration system
-- ✅ Steam API 429 rate limit handling with exponential backoff
-- ✅ RUB currency price parsing (handles '135,00 ₽' and '1 350,00 ₽' formats)
-- ✅ median_price as primary source, lowest_price as fallback (most items have only median)
+**Production-ready stack:**
+- ✅ **3-service Docker Compose** — monitor loop, FastAPI backend, React+Nginx frontend
+- ✅ **Professional monitoring panel** — dashboard KPIs, opportunities table, watchlist, positions, trades, backtests, system health, live logs (REST + WebSocket)
+- ✅ **Risk management** — `RiskManager` gates paper BUYs and sizes positions
+- ✅ **Market analytics** — `MarketAnalytics` + dedicated `price_history.db`
+- ✅ **Auto-scanner** — discovers liquid CS2 items (`app/scanner.py`)
+- ✅ **Steam cookie auth** for Docker (session cookies in existing `.env`)
+- ✅ **Frontend TypeScript build** passes in Docker (`tsc -b && vite build`)
 
-**In Progress / High Priority:**
-- Full implementation of new "High-Quality Rare Trades" strategy
-- Advanced signal filters and profit calculation
-- Smart Item management (`items.json` + scoring)
-- ✅ Risk management & position sizing module (`app/risk_manager.py`)
-- ✅ Professional Monitoring Web Panel (FastAPI + React) — `backend/`, `frontend/`
-- Enhanced Streamlit dashboard with statistics and charts
+**Core monitor (completed):**
+- SQLite + SQLAlchemy, Steam API client, indicators, signals, paper trading, Telegram alerts
+- Steam 429 backoff, RUB price parsing, median_price fallback
+- Streamlit dashboard (`web/dashboard.py`) — legacy, still available
+
+**In progress / next:**
+- Cookie expiry detection + Telegram warning
+- Telegram healthcheck / startup connectivity test
+- Enhanced Streamlit dashboard parity with React panel
 - State persistence and graceful shutdown
+- Full strict "High-Quality Mean Reversion" filter rollout in `trading_engine.py`
 
 ---
 
@@ -77,33 +75,38 @@ Build a reliable semi-automated trading tool for the Steam Market that helps gen
 
 ### Docker (Multi-Container)
 
-Four‑service Docker Compose stack managed from a single command:
+Three-service Docker Compose stack — one command starts the full system:
 
-| Service          | Container              | Dockerfile            | Port(s)  | Purpose                      |
-|------------------|------------------------|-----------------------|----------|------------------------------|
-| `steam-monitor`  | `steam-monitor`        | `Dockerfile`          | —        | Main Python monitor loop     |
-| `backend`        | `steam-monitor-backend`| `Dockerfile.backend`  | `8000`   | FastAPI + WebSocket API      |
-| `frontend`       | `steam-monitor-frontend`| `Dockerfile.frontend`| `5173:80`| React SPA served by Nginx    |
+| Service          | Container               | Dockerfile             | Port(s)   | Purpose                         |
+|------------------|-------------------------|------------------------|-----------|---------------------------------|
+| `steam-monitor`  | `steam-monitor`         | `Dockerfile`           | —         | Main Python monitor loop        |
+| `backend`        | `steam-monitor-backend` | `Dockerfile.backend`   | `8000`    | FastAPI REST + WebSocket `/ws`  |
+| `frontend`       | `steam-monitor-frontend`| `Dockerfile.frontend`  | `5173:80` | React SPA (Nginx + API proxy)   |
 
-- All services share the same `.env` file.
-- Frontend proxies `/api` and `/ws` to the backend via Nginx.
-- Persistent named volumes for `data/` and `logs/`.
-- Healthchecks on backend and frontend.
-- Steam IP blocks solved via session cookie authentication (`STEAM_SESSION_COOKIE`, `STEAM_LOGIN_SECURE` in `.env`).
+**Networking & data:**
+- Bridge network `steam-network`; services resolve each other by container name.
+- Bind mounts: `./data`, `./logs`, `./charts` (monitor); `./data`, `./logs` (backend).
+- All services load the **existing** project `.env` via `env_file: .env` (never recreate or commit).
+- Nginx in `frontend` proxies `/api/` and `/ws` → `steam-monitor-backend:8000` (`nginx.conf`).
+- Backend healthcheck uses Python `urllib` (no extra `curl` package in image).
 
-**Docker Deployment Commands:**
+**How to Run (Docker):**
 ```bash
-# Build and start all services in detached mode
-docker-compose up -d --build
+# Stop, rebuild, and start all services
+docker-compose down && docker-compose up -d --build
 
-# Follow logs for a specific service (e.g., steam-monitor)
+# Check status
+docker-compose ps
+
+# Follow logs
 docker-compose logs -f steam-monitor
-
-# Stop and remove all containers
-docker-compose down
+docker-compose logs -f backend
+docker-compose logs -f frontend
 ```
 
-**Open** http://localhost:5173 to access the monitoring panel.
+**URLs:**
+- Monitoring panel: http://localhost:5173
+- API docs / health: http://localhost:8000/api/health , http://localhost:8000/docs
 
 **Main Components:**
 - `main.py` → Entry point (starts dashboard and/or monitor)
@@ -451,33 +454,26 @@ uvicorn backend.main:app --host 0.0.0.0 --port 8000
 
 ---
 
-## Next Development Steps (Priority)
+## Roadmap (Priority)
 
-1. ~~Update trading strategy with new strict filters (Prompt 1)~~ ✅ Done
-2. ~~Implement full Paper SELL + improved PnL tracking (Prompt 2)~~ ✅ Done
-3. ~~Smart items management + `items.json` (Prompt 3)~~ ✅ Done
-4. ✅ Steam API price parsing for RUB currency
-5. ✅ Steam 429 rate limit handling with backoff
-6. ~~Risk management module (`app/risk_manager.py`)~~ ✅ Done
-7. Enhanced dashboard with statistics and indicators
-8. Statistics collection + weekly Telegram reports
-9. State persistence and graceful shutdown
-10. ✅ Docker network fix for Steam API access
-11. ✅ Steam API headers updated
-12. ✅ Steam cookie authentication for Docker
-13. [ ] Cookie expiry detection — Telegram warning when cookies near expiry
-14. ✅ Telegram timeout fix and proxy support
-15. [ ] Telegram healthcheck endpoint
-16. [ ] Automatic Telegram connectivity test on startup
-17. [ ] Telegram circuit breaker after repeated failures
-18. ✅ Auto-scanner for real Steam Market items (`app/scanner.py`)
-19. [ ] Scanner dashboard statistics
-20. [ ] Automatic bad-item pruning
-21. ✅ Historical profitability scoring (`app/analytics.py` + `price_history.db`)
-22. [ ] Price spread analytics
-23. [ ] Scanner caching layer
+| Status | Item |
+|--------|------|
+| ✅ | Paper trading BUY/SELL + PnL, smart `items.json`, Steam RUB parsing & 429 backoff |
+| ✅ | Risk management (`app/risk_manager.py`) |
+| ✅ | Price history DB + `MarketAnalytics` scoring |
+| ✅ | Auto-scanner (`app/scanner.py`) |
+| ✅ | FastAPI + React monitoring panel (`backend/`, `frontend/`) |
+| ✅ | Docker 3-service stack with Nginx API proxy |
+| ✅ | Telegram timeout + optional proxy |
+| [ ] | Cookie expiry detection → Telegram warning |
+| [ ] | Telegram healthcheck + startup connectivity test |
+| [ ] | Strict mean-reversion filters fully enforced in live signals |
+| [ ] | Weekly Telegram performance digest |
+| [ ] | State persistence + graceful monitor shutdown |
+| [ ] | Scanner stats UI, bad-item pruning, scanner cache |
+| [ ] | Price spread analytics; history-backed Streamlit charts |
 
 ---
 
-**Last Updated:** May 25, 2026 (Docker multi-container setup updated)  
-**Project Phase:** Professional FastAPI+React monitoring panel; risk management live (`RiskManager`); market intelligence scoring (`MarketAnalytics`); auto-scanner operational; dedicated price history DB; full Docker deployment with Steam cookie auth
+**Last Updated:** May 25, 2026  
+**Project Phase:** Docker stack production-ready; FastAPI+React panel is the primary operator UI; monitor + analytics + risk management operational

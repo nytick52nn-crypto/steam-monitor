@@ -214,7 +214,7 @@ export function OpportunitiesTable({
 
       <div className="flex items-center justify-between text-sm text-slate-400">
         <span>
-          {total} items · page {page}/{totalPages}
+          {total} items · page {page}/{totalPages} ({pageSize} per page)
         </span>
         <div className="flex gap-2">
           <Button
