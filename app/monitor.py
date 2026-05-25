@@ -5,7 +5,7 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
-from app.config import CHECK_INTERVAL_SEC, ITEMS_FILE
+from app.config import AUTO_SCAN_ENABLED, CHECK_INTERVAL_SEC, ITEMS_FILE
 from app.database import SessionLocal
 from app.logger import setup_logging
 from app.models import PriceHistory
@@ -151,6 +151,19 @@ def process_item(item: dict) -> bool:
 
 def run_monitor() -> None:
     items = load_items()
+
+    if AUTO_SCAN_ENABLED:
+        try:
+            from app.scanner import SteamMarketScanner
+
+            scanner = SteamMarketScanner()
+            new_items = scanner.scan()
+            scanner.update_items_file(ITEMS_FILE, new_items)
+            items = load_items(ITEMS_FILE)
+            log.info("Items reloaded after scan: %d total", len(items))
+        except Exception as e:
+            log.exception("Scanner failed but monitor continues: %s", e)
+
     log.info("Monitor started. Items=%d, interval=%ds", len(items), CHECK_INTERVAL_SEC)
 
     while True:

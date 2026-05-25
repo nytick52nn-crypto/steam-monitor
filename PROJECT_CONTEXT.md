@@ -90,6 +90,7 @@ Single service, full Docker deployment.
 
 **Key Modules:**
 - `config.py` — All settings, thresholds, API keys
+- `scanner.py` — Auto-discovers liquid CS2 items from Steam Market search; updates `items.json` safely with popularity/volume filtering; respects Steam anti-rate-limit delays
 - `trading_engine.py` — Main signal analysis logic
 - `signals.py` — Signal evaluation and Telegram triggering
 - `monitor.py` — Main scanning loop for items
@@ -108,6 +109,7 @@ Single service, full Docker deployment.
 | API              | Endpoint                                      | Purpose                              |
 |------------------|-----------------------------------------------|--------------------------------------|
 | Steam Market     | `https://steamcommunity.com/market/priceoverview/` | Price, volume, median price data |
+| Steam Market     | `https://steamcommunity.com/market/search/render/` | Auto-scanner: discover popular CS2 listings |
 | Telegram Bot     | `https://api.telegram.org`                    | Notifications + chart images         |
 
 ---
@@ -145,6 +147,7 @@ steam-monitor/
 │   ├── models.py
 │   ├── logger.py
 │   ├── steam_api.py
+│   ├── scanner.py
 │   ├── monitor.py
 │   ├── indicators.py
 │   ├── trading_engine.py
@@ -178,6 +181,7 @@ text
 - `.env` contains Telegram bot credentials and Steam session tokens
 - Proxy credentials may also exist in `.env`
 - Steam cookies expire ~30 days — refresh when 429s or blocks increase
+- Auto-scanner uses authenticated Steam session cookies (`STEAM_SESSION_COOKIE`, `STEAM_LOGIN_SECURE`) — never log cookie values
 
 ---
 
@@ -205,6 +209,12 @@ text
 - Use `TELEGRAM_PROXY_URL` if requests timeout
 - High retry delays can slow notifications
 
+### Steam Market scanner:
+- Steam Market scanning may trigger rate limits (HTTP 429)
+- Aggressive scan intervals (`AUTO_SCAN_INTERVAL_HOURS` too low) increase block risk
+- Scanner depends on Steam Market search API availability
+- Use `SCANNER_REQUEST_DELAY` ≥ 5s and keep `SCAN_TOTAL_ITEMS` modest (default 50)
+
 ---
 
 ## Configuration (.env)
@@ -224,6 +234,14 @@ text
 - `STEAM_REQUEST_DELAY_MIN=10` — Minimum delay between Steam requests (seconds)
 - `STEAM_REQUEST_DELAY_MAX=20` — Maximum delay between Steam requests (seconds)
 - *Keep 10–20s delays to avoid Steam 429 rate limit bans*
+
+**Auto scanner:**
+- `AUTO_SCAN_ENABLED` — Run market discovery on monitor startup (`false` by default)
+- `AUTO_SCAN_INTERVAL_HOURS` — Minimum hours between scans (default 24)
+- `SCAN_TOTAL_ITEMS` — Max new listings to fetch per scan (default 50)
+- `SCANNER_REQUEST_DELAY` — Seconds between scanner HTTP requests (default 5)
+- `MIN_PRICE_RUB` / `MAX_PRICE_RUB` — Scanner price filter range (defaults 50–5000)
+- `MIN_VOLUME_PER_DAY` — Minimum listing volume for scanner (default 20; raise in `.env` for stricter trading signals, e.g. 80)
 
 ---
 
@@ -246,8 +264,14 @@ text
 15. [ ] Telegram healthcheck endpoint
 16. [ ] Automatic Telegram connectivity test on startup
 17. [ ] Telegram circuit breaker after repeated failures
+18. ✅ Auto-scanner for real Steam Market items (`app/scanner.py`)
+19. [ ] Scanner dashboard statistics
+20. [ ] Automatic bad-item pruning
+21. [ ] Historical profitability scoring
+22. [ ] Price spread analytics
+23. [ ] Scanner caching layer
 
 ---
 
 **Last Updated:** May 25, 2026  
-**Project Phase:** Full Docker deployment, Steam auth via cookies; Telegram proxy support added; network fault tolerance improved
+**Project Phase:** Dynamic Steam Market discovery enabled; auto-scanner operational; full Docker deployment with Steam cookie auth

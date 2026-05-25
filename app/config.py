@@ -62,7 +62,21 @@ STEAM_MARKET_FEE_PCT = float(os.getenv("STEAM_MARKET_FEE_PCT", 15))
 
 MIN_HISTORY_FOR_SIGNAL = int(os.getenv("MIN_HISTORY_FOR_SIGNAL", 20))
 ALERT_COOLDOWN_SEC = int(os.getenv("ALERT_COOLDOWN_SEC", 3600))
-SCAN_TOTAL_ITEMS = int(os.getenv("SCAN_TOTAL_ITEMS", 300))
+AUTO_SCAN_ENABLED = os.getenv(
+    "AUTO_SCAN_ENABLED", "false"
+).lower() in ("1", "true", "yes")
+
+AUTO_SCAN_INTERVAL_HOURS = int(
+    os.getenv("AUTO_SCAN_INTERVAL_HOURS", "24")
+)
+
+SCAN_TOTAL_ITEMS = int(
+    os.getenv("SCAN_TOTAL_ITEMS", "50")
+)
+
+SCANNER_REQUEST_DELAY = float(
+    os.getenv("SCANNER_REQUEST_DELAY", "5")
+)
 
 CHECK_INTERVAL_MIN = int(os.getenv("CHECK_INTERVAL_MIN", 1))
 CHECK_INTERVAL_SEC = int(os.getenv("CHECK_INTERVAL_SEC", CHECK_INTERVAL_MIN * 60))
@@ -72,9 +86,17 @@ BUY_THRESHOLD_PCT = float(os.getenv("BUY_THRESHOLD_PCT", 22))
 SELL_THRESHOLD_PCT = float(os.getenv("SELL_THRESHOLD_PCT", 20))
 MIN_PROFIT_PCT = float(os.getenv("MIN_PROFIT_PCT", 15))
 SELL_PROFIT_PCT = float(os.getenv("SELL_PROFIT_PCT", 14))
-MIN_VOLUME_PER_DAY = int(os.getenv("MIN_VOLUME_PER_DAY", 80))
-MIN_PRICE_RUB = float(os.getenv("MIN_PRICE_RUB", 30))
-MAX_PRICE_RUB = float(os.getenv("MAX_PRICE_RUB", 2500))
+MIN_VOLUME_PER_DAY = int(
+    os.getenv("MIN_VOLUME_PER_DAY", "20")
+)
+
+MIN_PRICE_RUB = float(
+    os.getenv("MIN_PRICE_RUB", "50")
+)
+
+MAX_PRICE_RUB = float(
+    os.getenv("MAX_PRICE_RUB", "5000")
+)
 
 # --- Steam API delays (seconds between requests) ---
 # Keep at 10-20s to avoid 429 rate limit bans from Steam
