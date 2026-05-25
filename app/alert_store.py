@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
@@ -29,11 +29,7 @@ def should_send_signal_alert(item_name: str, signal: str) -> bool:
             return True
 
         if last.signal == signal:
-            now = datetime.now(timezone.utc)
-            sent_at = last.sent_at
-            if sent_at.tzinfo is None:
-                sent_at = sent_at.replace(tzinfo=timezone.utc)
-            age = now - sent_at
+            age = datetime.utcnow() - last.sent_at
             if age < timedelta(seconds=ALERT_COOLDOWN_SEC):
                 log.info(
                     "Skipping duplicate %s for %s (cooldown %ds remaining)",

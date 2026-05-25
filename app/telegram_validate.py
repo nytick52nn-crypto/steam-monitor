@@ -1,6 +1,6 @@
 """Startup validation for Telegram alerts."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 import pandas as pd
 
@@ -55,7 +55,7 @@ def _load_any_history() -> tuple[str, pd.DataFrame] | tuple[None, None]:
 
 
 def _synthetic_history(base_price: float = 3000.0, points: int = 25) -> pd.DataFrame:
-    now = datetime.now(timezone.utc)
+    now = datetime.utcnow()
     times = [now - timedelta(hours=points - i) for i in range(points)]
     prices = [base_price + (i % 5) * 10 - (i * 2) for i in range(points)]
     return pd.DataFrame({"created_at": times, "price": prices, "volume": [50] * points})

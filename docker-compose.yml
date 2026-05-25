@@ -1,57 +1,11 @@
 services:
   steam-monitor:
     build: .
-    container_name: steam-monitor
-    env_file: .env
+    ports:
+      - "8501:8501"
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
       - ./charts:/app/charts
-    restart: unless-stopped
-    networks:
-      - steam-network
-
-  backend:
-    build:
-      context: .
-      dockerfile: Dockerfile.backend
-    container_name: steam-monitor-backend
-    ports:
-      - "8000:8000"
     env_file: .env
-    volumes:
-      - ./data:/app/data
-      - ./logs:/app/logs
-    depends_on:
-      - steam-monitor
     restart: unless-stopped
-    networks:
-      - steam-network
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=5)"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 20s
-
-  frontend:
-    build:
-      context: .
-      dockerfile: Dockerfile.frontend
-    container_name: steam-monitor-frontend
-    ports:
-      - "5173:80"
-    depends_on:
-      backend:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - steam-network
-
-networks:
-  steam-network:
-    driver: bridge
-
-volumes:
-  data:
-  logs:

@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime
 
 from sqlalchemy.orm import Session
 
@@ -25,7 +25,7 @@ def _get_wallet(db: Session, *, create: bool = False) -> Wallet | None:
         id=WALLET_ID,
         balance=WALLET_INITIAL_BALANCE,
         starting_balance=WALLET_INITIAL_BALANCE,
-        updated_at=datetime.now(timezone.utc),
+        updated_at=datetime.utcnow(),
     )
     db.add(wallet)
     db.commit()
@@ -72,7 +72,7 @@ def deposit(amount: float, note: str = "") -> float:
     try:
         wallet = _get_wallet(db, create=True)
         wallet.balance = float(wallet.balance) + amount
-        wallet.updated_at = datetime.now(timezone.utc)
+        wallet.updated_at = datetime.utcnow()
         db.commit()
         log.info("Wallet deposit: +%.2f -> balance=%.2f %s", amount, wallet.balance, note)
         return float(wallet.balance)
@@ -96,7 +96,7 @@ def withdraw(amount: float, note: str = "") -> float:
                 f"Insufficient balance: have {wallet.balance:.2f}, need {amount:.2f}"
             )
         wallet.balance = new_balance
-        wallet.updated_at = datetime.now(timezone.utc)
+        wallet.updated_at = datetime.utcnow()
         db.commit()
         log.info("Wallet withdraw: -%.2f -> balance=%.2f %s", amount, wallet.balance, note)
         return float(wallet.balance)

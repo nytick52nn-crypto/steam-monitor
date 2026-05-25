@@ -62,21 +62,7 @@ STEAM_MARKET_FEE_PCT = float(os.getenv("STEAM_MARKET_FEE_PCT", 15))
 
 MIN_HISTORY_FOR_SIGNAL = int(os.getenv("MIN_HISTORY_FOR_SIGNAL", 20))
 ALERT_COOLDOWN_SEC = int(os.getenv("ALERT_COOLDOWN_SEC", 3600))
-AUTO_SCAN_ENABLED = os.getenv(
-    "AUTO_SCAN_ENABLED", "false"
-).lower() in ("1", "true", "yes")
-
-AUTO_SCAN_INTERVAL_HOURS = int(
-    os.getenv("AUTO_SCAN_INTERVAL_HOURS", "24")
-)
-
-SCAN_TOTAL_ITEMS = int(
-    os.getenv("SCAN_TOTAL_ITEMS", "50")
-)
-
-SCANNER_REQUEST_DELAY = float(
-    os.getenv("SCANNER_REQUEST_DELAY", "5")
-)
+SCAN_TOTAL_ITEMS = int(os.getenv("SCAN_TOTAL_ITEMS", 300))
 
 CHECK_INTERVAL_MIN = int(os.getenv("CHECK_INTERVAL_MIN", 1))
 CHECK_INTERVAL_SEC = int(os.getenv("CHECK_INTERVAL_SEC", CHECK_INTERVAL_MIN * 60))
@@ -86,17 +72,9 @@ BUY_THRESHOLD_PCT = float(os.getenv("BUY_THRESHOLD_PCT", 22))
 SELL_THRESHOLD_PCT = float(os.getenv("SELL_THRESHOLD_PCT", 20))
 MIN_PROFIT_PCT = float(os.getenv("MIN_PROFIT_PCT", 15))
 SELL_PROFIT_PCT = float(os.getenv("SELL_PROFIT_PCT", 14))
-MIN_VOLUME_PER_DAY = int(
-    os.getenv("MIN_VOLUME_PER_DAY", "20")
-)
-
-MIN_PRICE_RUB = float(
-    os.getenv("MIN_PRICE_RUB", "50")
-)
-
-MAX_PRICE_RUB = float(
-    os.getenv("MAX_PRICE_RUB", "5000")
-)
+MIN_VOLUME_PER_DAY = int(os.getenv("MIN_VOLUME_PER_DAY", 80))
+MIN_PRICE_RUB = float(os.getenv("MIN_PRICE_RUB", 30))
+MAX_PRICE_RUB = float(os.getenv("MAX_PRICE_RUB", 2500))
 
 # --- Steam API delays (seconds between requests) ---
 # Keep at 10-20s to avoid 429 rate limit bans from Steam
@@ -136,29 +114,3 @@ TELEGRAM_RETRY_DELAY = float(
 TELEGRAM_MAX_RETRIES = int(
     os.getenv("TELEGRAM_MAX_RETRIES", "3")
 )
-
-# --- Dedicated price history DB (analytics / trend detection) ---
-PRICE_HISTORY_DB = os.getenv(
-    "PRICE_HISTORY_DB",
-    "data/price_history.db",
-)
-PRICE_HISTORY_RETENTION_DAYS = int(
-    os.getenv("PRICE_HISTORY_RETENTION_DAYS", "30")
-)
-
-MIN_HISTORY_SNAPSHOTS = int(
-    os.getenv("MIN_HISTORY_SNAPSHOTS", "20")
-)
-
-ANALYTICS_LOOKBACK_HOURS = int(
-    os.getenv("ANALYTICS_LOOKBACK_HOURS", "24")
-)
-
-MIN_PROFIT_SCORE_ALERT = float(
-    os.getenv("MIN_PROFIT_SCORE_ALERT", "70")
-)
-
-# --- Risk management ---
-MAX_RISK_PER_TRADE = float(os.getenv("MAX_RISK_PER_TRADE", "0.015"))
-MAX_PORTFOLIO_HEAT = float(os.getenv("MAX_PORTFOLIO_HEAT", "0.30"))
-POSITION_SCALING_FACTOR = float(os.getenv("POSITION_SCALING_FACTOR", "1.0"))

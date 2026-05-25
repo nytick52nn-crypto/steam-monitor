@@ -13,15 +13,13 @@ from app.indicators import add_indicators
 from app.logger import setup_logging
 from app.models import PriceHistory
 from app.notifier import is_telegram_configured, send_signal_alert, send_sell_alert
-from app.paper_trading import execute_paper_buy, execute_paper_sell, get_open_positions
-from app.risk_manager import RiskManager
+from app.paper_trading import execute_paper_buy, execute_paper_sell, has_open_position, get_open_positions
 from app.roi import calc_buy_metrics, calc_sell_metrics
 from app.trading_engine import get_detailed_trade_signal
 
 log = setup_logging("signals")
 
 _last_evaluated: dict[str, str] = {}
-_risk_manager = RiskManager()
 
 
 def load_price_history(item_name: str, db: Session) -> pd.DataFrame:
@@ -118,55 +116,7 @@ def evaluate_and_notify(
         return signal
 
     if signal == "BUY":
-        from app.wallet import get_balance
-
-        open_positions = get_open_positions()
-        balance = get_balance()
-        metrics = _risk_manager.get_item_risk_metrics(item_name)
-        profit_score = metrics["profit_score"]
-        vol_risk = metrics["volatility_risk"]
-        if profit_score < 0:
-            profit_score = float(result.get("estimated_profit_pct", 0) or 0) * 3.0
-
-        allowed, risk_reason = _risk_manager.is_trade_allowed(
-            item_name,
-            profit_score,
-            vol_risk,
-            balance,
-            open_positions,
-        )
-        if not allowed:
-            log.info(
-                "BUY blocked by risk for %s: %s (score=%.0f heat ok=%s)",
-                item_name,
-                risk_reason,
-                profit_score,
-                _risk_manager.check_portfolio_heat(open_positions, balance),
-            )
-            return "HOLD"
-
-        position_size = _risk_manager.calculate_position_size(
-            balance, profit_score, vol_risk, item_name
-        )
-        quantity = (
-            round(position_size / current_price, 4)
-            if current_price > 0 and position_size > 0
-            else 0.0
-        )
-        stop_loss = _risk_manager.calculate_dynamic_stop_loss(
-            current_price, vol_risk
-        )
-        log.info(
-            "Risk-approved BUY %s: size=%.2f qty=%.4f stop=%.2f",
-            item_name,
-            position_size,
-            quantity,
-            stop_loss,
-        )
-
-        position = execute_paper_buy(
-            item_name, current_price, quantity=max(quantity, 0.0001)
-        )
+        position = execute_paper_buy(item_name, current_price)
         if position:
             log.info("Paper position opened for %s (id=%s)", item_name, position.id)
 

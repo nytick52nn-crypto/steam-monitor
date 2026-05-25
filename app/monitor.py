@@ -5,19 +5,14 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
-from app.config import AUTO_SCAN_ENABLED, CHECK_INTERVAL_SEC, ITEMS_FILE
+from app.config import CHECK_INTERVAL_SEC, ITEMS_FILE
 from app.database import SessionLocal
-from app.history import init_db, save_bulk_snapshots
 from app.logger import setup_logging
 from app.models import PriceHistory
-from app.risk_manager import RiskManager
 from app.signals import evaluate_and_notify
 from app.steam_api import get_priceoverview
-from app.wallet import get_balance
 
 log = setup_logging("monitor")
-
-_risk_manager = RiskManager()
 
 FALLBACK_ITEMS = [
     {"name": "Fracture Case", "hash_name": "Fracture%20Case", "enabled": True, "priority": 1},
@@ -116,38 +111,7 @@ def save_price(item_name: str, price: float, volume: int) -> bool:
             db.close()
 
 
-def _check_risk_before_signal(item_name: str, current_price: float) -> None:
-    """Log risk context before signal evaluation (never raises)."""
-    try:
-        from app.paper_trading import get_open_positions
-
-        balance = get_balance()
-        open_positions = get_open_positions()
-        metrics = _risk_manager.get_item_risk_metrics(item_name)
-        profit_score = metrics["profit_score"]
-        if profit_score < 0:
-            profit_score = 0.0
-        allowed, reason = _risk_manager.is_trade_allowed(
-            item_name,
-            profit_score,
-            metrics["volatility_risk"],
-            balance,
-            open_positions,
-        )
-        heat = _risk_manager.portfolio_heat_ratio(open_positions, balance)
-        log.debug(
-            "Risk pre-check %s @ %.2f: allowed=%s heat=%.1f%% reason=%s",
-            item_name,
-            current_price,
-            allowed,
-            heat * 100,
-            reason,
-        )
-    except Exception as exc:
-        log.debug("Risk pre-check skipped for %s: %s", item_name, exc)
-
-
-def process_item(item: dict) -> tuple[bool, dict | None]:
+def process_item(item: dict) -> bool:
     item_name = item["name"]
     hash_name = item.get("hash_name", item_name)
     log.info("Fetching: %s", item_name)
@@ -155,30 +119,24 @@ def process_item(item: dict) -> tuple[bool, dict | None]:
 
     if not data:
         log.warning("No data returned for: %s", item_name)
-        return False, None
+        return False
 
     lowest_price = data.get("median_price") or data.get("lowest_price")
     if not lowest_price:
         log.warning("No price in response for: %s | data=%s", item_name, data)
-        return False, None
+        return False
 
-    price = (
-        float(lowest_price)
-        if isinstance(lowest_price, (int, float))
-        else parse_price(str(lowest_price))
-    )
+    price = parse_price(lowest_price)
     if price is None:
         log.warning("Price parse failed for %s: %r", item_name, lowest_price)
-        return False, None
+        return False
 
     volume = parse_volume(data.get("volume", 0))
-    snapshot = {"item_name": item_name, "price": price, "volume": volume}
     saved = save_price(item_name=item_name, price=price, volume=volume)
 
     if saved:
         median_raw = data.get("median_price")
         median_price = parse_price(median_raw) if median_raw else None
-        _check_risk_before_signal(item_name, price)
         signal = evaluate_and_notify(
             item_name=item_name,
             current_price=price,
@@ -188,59 +146,23 @@ def process_item(item: dict) -> tuple[bool, dict | None]:
         if signal:
             log.info("Signal for %s: %s", item_name, signal)
 
-    return saved, snapshot
+    return saved
 
 
 def run_monitor() -> None:
-    try:
-        init_db()
-    except Exception as exc:
-        log.error("Price history DB init skipped (monitor continues): %s", exc)
-
     items = load_items()
-
-    if AUTO_SCAN_ENABLED:
-        try:
-            from app.scanner import SteamMarketScanner
-
-            scanner = SteamMarketScanner()
-            new_items = scanner.scan()
-            scanner.update_items_file(ITEMS_FILE, new_items)
-            items = load_items(ITEMS_FILE)
-            log.info("Items reloaded after scan: %d total", len(items))
-        except Exception as e:
-            log.exception("Scanner failed but monitor continues: %s", e)
-
     log.info("Monitor started. Items=%d, interval=%ds", len(items), CHECK_INTERVAL_SEC)
 
     while True:
         log.info("--- Scan cycle started ---")
         saved = 0
-        snapshots: list[dict] = []
 
         for item in items:
             try:
-                ok, snapshot = process_item(item)
-                if snapshot:
-                    snapshots.append(snapshot)
-                if ok:
+                if process_item(item):
                     saved += 1
             except Exception as exc:
                 log.exception("Unexpected error for %s: %s", item.get("name", item), exc)
-
-        if snapshots:
-            try:
-                save_bulk_snapshots(snapshots)
-            except Exception as exc:
-                log.error("Price history bulk save failed (monitor continues): %s", exc)
-
-        if saved > 0:
-            try:
-                from app.analytics import run_cycle_analytics
-
-                run_cycle_analytics()
-            except Exception as exc:
-                log.error("Analytics failed (monitor continues): %s", exc)
 
         log.info("Scan complete: %d/%d items saved", saved, len(items))
         log.info("Sleeping %d seconds...", CHECK_INTERVAL_SEC)
