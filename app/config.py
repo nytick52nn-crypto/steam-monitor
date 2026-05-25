@@ -99,3 +99,6 @@ MAX_POSITION_PCT = float(os.getenv("MAX_POSITION_PCT", 10))
 # true  = бот только логирует сигналы, не открывает paper позиции
 # false = бот открывает paper позиции при сигнале
 DRY_RUN = os.getenv("DRY_RUN", "true").lower() in ("1", "true", "yes")
+
+STEAM_SESSION_COOKIE = os.getenv("STEAM_SESSION_COOKIE", "").strip()
+STEAM_LOGIN_SECURE = os.getenv("STEAM_LOGIN_SECURE", "").strip()

@@ -25,6 +25,28 @@ HEADERS = {
 }
 
 
+def get_steam_session() -> requests.Session:
+    from app.config import STEAM_LOGIN_SECURE, STEAM_SESSION_COOKIE
+
+    session = requests.Session()
+    session.headers.update(HEADERS)
+    if STEAM_SESSION_COOKIE and STEAM_LOGIN_SECURE:
+        session.cookies.set(
+            "sessionid",
+            STEAM_SESSION_COOKIE,
+            domain="steamcommunity.com",
+        )
+        session.cookies.set(
+            "steamLoginSecure",
+            STEAM_LOGIN_SECURE,
+            domain="steamcommunity.com",
+        )
+        log.info("Steam: authenticated session active")
+    else:
+        log.warning("Steam: anonymous — add cookies to .env to avoid blocks")
+    return session
+
+
 def _parse_price(price_str: str | None) -> float | None:
     """Parse Steam price string to float.
     Handles formats: '135,00 ₽', '1 350,00 ₽', '$1.35', '1.35 USD'
@@ -92,10 +114,9 @@ def get_priceoverview(market_hash_name: str, retries: int = 2) -> dict | None:
                 STEAM_CURRENCY,
                 attempt,
             )
-            response = requests.get(
+            response = get_steam_session().get(
                 STEAM_PRICE_URL,
                 params=params,
-                headers=HEADERS,
                 timeout=30,
             )
 

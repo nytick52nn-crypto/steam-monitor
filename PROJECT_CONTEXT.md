@@ -76,10 +76,10 @@ Build a reliable semi-automated trading tool for the Steam Market that helps gen
 
 ### Docker
 
-Two services: **dashboard** (bridge network, port 8501) + **monitor** (host network, bypasses Steam IP blocks).
+Single service, full Docker deployment.
 
-- `dashboard`: Streamlit UI, published on `8501:8501`, shared volumes for `data/`, `logs/`, `charts/`.
-- `monitor`: `network_mode: host`, runs `python main.py` for Steam API polling using the host network stack.
+- `steam-monitor`: builds from `Dockerfile`, runs `main.py` (dashboard + monitor), published on `8501:8501`, shared volumes for `data/`, `logs/`, `charts/`.
+- Steam IP blocks solved via session cookie authentication (`STEAM_SESSION_COOKIE`, `STEAM_LOGIN_SECURE` in `.env`).
 
 **Main Components:**
 - `main.py` → Entry point (starts dashboard and/or monitor)
@@ -165,12 +165,18 @@ text
 
 ---
 
+## Security Notes
+
+- **NEVER commit `.env`** — contains Steam session tokens and Telegram credentials
+- Steam cookies expire ~30 days — refresh when 429s or blocks increase
+
+---
+
 ## Known Issues / Bugs
 
 ### Fixed Issues:
-- ✅ **FIXED: Docker container SSL timeout on steamcommunity.com**
-- **Root cause:** Steam blocks virtual/NAT IPs from Docker
-- **Solution:** monitor service uses `network_mode: host`
+- ✅ **FIXED: Steam Docker IP block** — Authenticated requests via `sessionid` + `steamLoginSecure` cookies in `.env`
+- ✅ **FIXED: Docker container SSL timeout on steamcommunity.com** (superseded by cookie auth; no `network_mode: host` required)
 
 ## Known Issues / Fixes (May 2026)
 
@@ -187,13 +193,12 @@ text
 
 ---
 
-## Known Limitations
-
-- `network_mode: host` only works on Linux Docker. On Windows/Mac Docker Desktop: use `host.docker.internal` OR run `python main.py` directly on the Windows host.
-
----
-
 ## Configuration (.env)
+
+**Steam session (required for Docker):**
+- `STEAM_SESSION_COOKIE` — `sessionid` cookie from steamcommunity.com (browser DevTools → Application → Cookies)
+- `STEAM_LOGIN_SECURE` — `steamLoginSecure` cookie from the same place
+- Refresh both ~every 30 days when 429s or blocks increase
 
 **Steam API:**
 - `STEAM_REQUEST_DELAY_MIN=10` — Minimum delay between Steam requests (seconds)
@@ -215,8 +220,10 @@ text
 9. State persistence and graceful shutdown
 10. ✅ Docker network fix for Steam API access
 11. ✅ Steam API headers updated
+12. ✅ Steam cookie authentication for Docker
+13. [ ] Cookie expiry detection — Telegram warning when cookies near expiry
 
 ---
 
 **Last Updated:** May 25, 2026  
-**Project Phase:** Docker network fixed, Steam API headers corrected
+**Project Phase:** Full Docker deployment, Steam auth via cookies

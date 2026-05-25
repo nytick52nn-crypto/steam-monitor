@@ -1,5 +1,5 @@
 services:
-  dashboard:
+  steam-monitor:
     build: .
     ports:
       - "8501:8501"
@@ -8,16 +8,4 @@ services:
       - ./logs:/app/logs
       - ./charts:/app/charts
     env_file: .env
-    command: streamlit run web/dashboard.py --server.port 8501
-    restart: unless-stopped
-
-  monitor:
-    build: .
-    network_mode: host
-    volumes:
-      - ./data:/app/data
-      - ./logs:/app/logs
-      - ./charts:/app/charts
-    env_file: .env
-    command: python main.py
     restart: unless-stopped
