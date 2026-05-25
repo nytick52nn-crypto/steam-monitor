@@ -101,7 +101,8 @@ Single service, full Docker deployment.
 - `models.py` — SQLAlchemy database models
 - `database.py` — DB session management
 - `roi.py` — Profit, fee, and ROI calculations
-- `history.py` — Dedicated SQLite price snapshot store (`data/price_history.db`) for analytics, trends, and future profitability scoring
+- `history.py` — Dedicated SQLite price snapshot store (`data/price_history.db`) for analytics and trend detection
+- `analytics.py` — Read-only profitability scoring engine (`MarketAnalytics`) over price history DB; no Steam/network calls
 
 ---
 
@@ -121,11 +122,25 @@ Separate from the main SQLAlchemy DB (`data/steam_cards.db`), the monitor writes
 
 **Retention:** Cleanup runs automatically (~hourly) in the history worker; failures are logged and never stop the monitor.
 
-**Future analytics roadmap:**
-- Profitability scoring per item from historical spreads and volume
-- Trend detection (moving averages, drawdowns, seasonality)
-- Cross-item correlation and scanner quality feedback
-- Dashboard charts sourced from dedicated history DB
+**Intelligent market scoring (`app/analytics.py`):**
+- `MarketAnalytics` reads `price_history.db` in read-only mode (WAL-safe, short timeout, indexed queries)
+- Runs after each monitor cycle when at least one price was saved; failures never stop the monitor
+- Per-item metrics: price change, liquidity, volatility (moderate preferred), momentum, spread stability
+- `profit_score` (0–100) combines movement, liquidity, volatility, and spread stability; low-history items skipped
+- `get_top_opportunities()` logs ranked items; optional Telegram alerts when `profit_score >= MIN_PROFIT_SCORE_ALERT` (cooldown via `alert_store`)
+
+| Setting | Default | Purpose |
+|---------|---------|---------|
+| `MIN_HISTORY_SNAPSHOTS` | `20` | Minimum snapshots in lookback window to score an item |
+| `ANALYTICS_LOOKBACK_HOURS` | `24` | History window for all analytics queries |
+| `MIN_PROFIT_SCORE_ALERT` | `70` | Telegram alert threshold for high profit scores |
+
+**Historical analytics roadmap:**
+- [x] Profitability scoring per item from historical price and volume
+- [ ] Trend detection (moving averages, drawdowns, seasonality)
+- [ ] Cross-item correlation and scanner quality feedback
+- [ ] Dashboard charts sourced from dedicated history DB
+- [ ] Smarter alert deduplication and weekly analytics digest
 
 ---
 
@@ -183,6 +198,7 @@ steam-monitor/
 │   ├── notifier.py
 │   ├── roi.py
 │   ├── history.py
+│   ├── analytics.py
 │   └── alert_store.py
 │
 ├── web/
@@ -273,6 +289,9 @@ text
 **Price history (analytics DB):**
 - `PRICE_HISTORY_DB` — Path to dedicated snapshot SQLite (default `data/price_history.db`)
 - `PRICE_HISTORY_RETENTION_DAYS` — Days to keep snapshots before auto-cleanup (default 30)
+- `MIN_HISTORY_SNAPSHOTS` — Minimum snapshots required to score an item (default 20)
+- `ANALYTICS_LOOKBACK_HOURS` — Lookback window for analytics queries (default 24)
+- `MIN_PROFIT_SCORE_ALERT` — Telegram alert when profit score reaches this level (default 70)
 
 ---
 
@@ -298,11 +317,11 @@ text
 18. ✅ Auto-scanner for real Steam Market items (`app/scanner.py`)
 19. [ ] Scanner dashboard statistics
 20. [ ] Automatic bad-item pruning
-21. [ ] Historical profitability scoring (foundation: `app/history.py` + `price_history.db`)
+21. ✅ Historical profitability scoring (`app/analytics.py` + `price_history.db`)
 22. [ ] Price spread analytics
 23. [ ] Scanner caching layer
 
 ---
 
 **Last Updated:** May 25, 2026  
-**Project Phase:** Dynamic Steam Market discovery enabled; auto-scanner operational; dedicated price history DB for analytics; full Docker deployment with Steam cookie auth
+**Project Phase:** Market intelligence scoring live (`MarketAnalytics`); auto-scanner operational; dedicated price history DB; full Docker deployment with Steam cookie auth

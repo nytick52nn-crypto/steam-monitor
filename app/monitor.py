@@ -198,6 +198,14 @@ def run_monitor() -> None:
             except Exception as exc:
                 log.error("Price history bulk save failed (monitor continues): %s", exc)
 
+        if saved > 0:
+            try:
+                from app.analytics import run_cycle_analytics
+
+                run_cycle_analytics()
+            except Exception as exc:
+                log.error("Analytics failed (monitor continues): %s", exc)
+
         log.info("Scan complete: %d/%d items saved", saved, len(items))
         log.info("Sleeping %d seconds...", CHECK_INTERVAL_SEC)
         time.sleep(CHECK_INTERVAL_SEC)
