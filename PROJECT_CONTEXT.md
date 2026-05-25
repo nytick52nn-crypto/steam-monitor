@@ -239,7 +239,6 @@ steam-monitor/
 ├── docker-compose.yml               # 4-service stack
 ├── nginx.conf                       # Frontend reverse proxy config
 ├── requirements.txt
-├── .env.example
 ├── PROJECT_CONTEXT.md
 ├── commands.txt
 │
