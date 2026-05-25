@@ -136,3 +136,12 @@ TELEGRAM_RETRY_DELAY = float(
 TELEGRAM_MAX_RETRIES = int(
     os.getenv("TELEGRAM_MAX_RETRIES", "3")
 )
+
+# --- Dedicated price history DB (analytics / trend detection) ---
+PRICE_HISTORY_DB = os.getenv(
+    "PRICE_HISTORY_DB",
+    "data/price_history.db",
+)
+PRICE_HISTORY_RETENTION_DAYS = int(
+    os.getenv("PRICE_HISTORY_RETENTION_DAYS", "30")
+)

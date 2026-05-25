@@ -101,6 +101,31 @@ Single service, full Docker deployment.
 - `models.py` — SQLAlchemy database models
 - `database.py` — DB session management
 - `roi.py` — Profit, fee, and ROI calculations
+- `history.py` — Dedicated SQLite price snapshot store (`data/price_history.db`) for analytics, trends, and future profitability scoring
+
+---
+
+## Price History Database (Analytics)
+
+Separate from the main SQLAlchemy DB (`data/steam_cards.db`), the monitor writes time-series snapshots to **`data/price_history.db`** after each successful Steam price fetch.
+
+| Setting | Default | Purpose |
+|---------|---------|---------|
+| `PRICE_HISTORY_DB` | `data/price_history.db` | SQLite file path (persisted via Docker `./data` volume) |
+| `PRICE_HISTORY_RETENTION_DAYS` | `30` | Auto-delete snapshots older than N days |
+
+**Schema (`price_history` table):**
+- `id`, `item_name`, `price`, `volume`, `timestamp`
+- Index on `(item_name, timestamp)`
+- WAL mode, retry on `database locked`, background writer thread (non-blocking monitor loop)
+
+**Retention:** Cleanup runs automatically (~hourly) in the history worker; failures are logged and never stop the monitor.
+
+**Future analytics roadmap:**
+- Profitability scoring per item from historical spreads and volume
+- Trend detection (moving averages, drawdowns, seasonality)
+- Cross-item correlation and scanner quality feedback
+- Dashboard charts sourced from dedicated history DB
 
 ---
 
@@ -137,7 +162,8 @@ steam-monitor/
 ├── commands.txt
 │
 ├── data/
-│   ├── steam_cards.db               # SQLite database
+│   ├── steam_cards.db               # Main SQLite (signals, paper trading)
+│   ├── price_history.db             # Analytics price snapshots (WAL)
 │   ├── items.json                   # List of tracked items
 │   └── logs/
 │
@@ -156,6 +182,7 @@ steam-monitor/
 │   ├── wallet.py
 │   ├── notifier.py
 │   ├── roi.py
+│   ├── history.py
 │   └── alert_store.py
 │
 ├── web/
@@ -243,6 +270,10 @@ text
 - `MIN_PRICE_RUB` / `MAX_PRICE_RUB` — Scanner price filter range (defaults 50–5000)
 - `MIN_VOLUME_PER_DAY` — Minimum listing volume for scanner (default 20; raise in `.env` for stricter trading signals, e.g. 80)
 
+**Price history (analytics DB):**
+- `PRICE_HISTORY_DB` — Path to dedicated snapshot SQLite (default `data/price_history.db`)
+- `PRICE_HISTORY_RETENTION_DAYS` — Days to keep snapshots before auto-cleanup (default 30)
+
 ---
 
 ## Next Development Steps (Priority)
@@ -267,11 +298,11 @@ text
 18. ✅ Auto-scanner for real Steam Market items (`app/scanner.py`)
 19. [ ] Scanner dashboard statistics
 20. [ ] Automatic bad-item pruning
-21. [ ] Historical profitability scoring
+21. [ ] Historical profitability scoring (foundation: `app/history.py` + `price_history.db`)
 22. [ ] Price spread analytics
 23. [ ] Scanner caching layer
 
 ---
 
 **Last Updated:** May 25, 2026  
-**Project Phase:** Dynamic Steam Market discovery enabled; auto-scanner operational; full Docker deployment with Steam cookie auth
+**Project Phase:** Dynamic Steam Market discovery enabled; auto-scanner operational; dedicated price history DB for analytics; full Docker deployment with Steam cookie auth

@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.config import AUTO_SCAN_ENABLED, CHECK_INTERVAL_SEC, ITEMS_FILE
 from app.database import SessionLocal
+from app.history import init_db, save_bulk_snapshots
 from app.logger import setup_logging
 from app.models import PriceHistory
 from app.signals import evaluate_and_notify
@@ -111,7 +112,7 @@ def save_price(item_name: str, price: float, volume: int) -> bool:
             db.close()
 
 
-def process_item(item: dict) -> bool:
+def process_item(item: dict) -> tuple[bool, dict | None]:
     item_name = item["name"]
     hash_name = item.get("hash_name", item_name)
     log.info("Fetching: %s", item_name)
@@ -119,19 +120,24 @@ def process_item(item: dict) -> bool:
 
     if not data:
         log.warning("No data returned for: %s", item_name)
-        return False
+        return False, None
 
     lowest_price = data.get("median_price") or data.get("lowest_price")
     if not lowest_price:
         log.warning("No price in response for: %s | data=%s", item_name, data)
-        return False
+        return False, None
 
-    price = parse_price(lowest_price)
+    price = (
+        float(lowest_price)
+        if isinstance(lowest_price, (int, float))
+        else parse_price(str(lowest_price))
+    )
     if price is None:
         log.warning("Price parse failed for %s: %r", item_name, lowest_price)
-        return False
+        return False, None
 
     volume = parse_volume(data.get("volume", 0))
+    snapshot = {"item_name": item_name, "price": price, "volume": volume}
     saved = save_price(item_name=item_name, price=price, volume=volume)
 
     if saved:
@@ -146,10 +152,15 @@ def process_item(item: dict) -> bool:
         if signal:
             log.info("Signal for %s: %s", item_name, signal)
 
-    return saved
+    return saved, snapshot
 
 
 def run_monitor() -> None:
+    try:
+        init_db()
+    except Exception as exc:
+        log.error("Price history DB init skipped (monitor continues): %s", exc)
+
     items = load_items()
 
     if AUTO_SCAN_ENABLED:
@@ -169,13 +180,23 @@ def run_monitor() -> None:
     while True:
         log.info("--- Scan cycle started ---")
         saved = 0
+        snapshots: list[dict] = []
 
         for item in items:
             try:
-                if process_item(item):
+                ok, snapshot = process_item(item)
+                if snapshot:
+                    snapshots.append(snapshot)
+                if ok:
                     saved += 1
             except Exception as exc:
                 log.exception("Unexpected error for %s: %s", item.get("name", item), exc)
+
+        if snapshots:
+            try:
+                save_bulk_snapshots(snapshots)
+            except Exception as exc:
+                log.error("Price history bulk save failed (monitor continues): %s", exc)
 
         log.info("Scan complete: %d/%d items saved", saved, len(items))
         log.info("Sleeping %d seconds...", CHECK_INTERVAL_SEC)
