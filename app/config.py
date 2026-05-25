@@ -22,10 +22,6 @@ TELEGRAM_STARTUP_TEST = os.getenv("TELEGRAM_STARTUP_TEST", "true").lower() in ("
 TELEGRAM_VALIDATE_SIGNALS = os.getenv("TELEGRAM_VALIDATE_SIGNALS", "false").lower() in (
     "1", "true", "yes",
 )
-TELEGRAM_PROXY_URL = os.getenv("TELEGRAM_PROXY_URL", "").strip() or None
-TELEGRAM_REQUEST_TIMEOUT = float(os.getenv("TELEGRAM_REQUEST_TIMEOUT", 60))
-TELEGRAM_MAX_RETRIES = int(os.getenv("TELEGRAM_MAX_RETRIES", 3))
-
 _PLACEHOLDER_TOKENS = {"YOUR_BOT_TOKEN", "your_bot_token", ""}
 _PLACEHOLDER_CHATS = {"YOUR_CHAT_ID", "your_chat_id", ""}
 
@@ -102,3 +98,19 @@ DRY_RUN = os.getenv("DRY_RUN", "true").lower() in ("1", "true", "yes")
 
 STEAM_SESSION_COOKIE = os.getenv("STEAM_SESSION_COOKIE", "").strip()
 STEAM_LOGIN_SECURE = os.getenv("STEAM_LOGIN_SECURE", "").strip()
+
+TELEGRAM_REQUEST_TIMEOUT = float(
+    os.getenv("TELEGRAM_REQUEST_TIMEOUT", "15")
+)
+
+TELEGRAM_PROXY_URL = (
+    os.getenv("TELEGRAM_PROXY_URL", "").strip() or None
+)
+
+TELEGRAM_RETRY_DELAY = float(
+    os.getenv("TELEGRAM_RETRY_DELAY", "3")
+)
+
+TELEGRAM_MAX_RETRIES = int(
+    os.getenv("TELEGRAM_MAX_RETRIES", "3")
+)

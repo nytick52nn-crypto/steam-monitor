@@ -96,7 +96,7 @@ Single service, full Docker deployment.
 - `indicators.py` — Technical analysis calculations
 - `paper_trading.py` — Virtual trading simulation
 - `wallet.py` — Virtual wallet balance management
-- `notifier.py` — Telegram alerts and chart sending
+- `notifier.py` — Telegram alerts and chart sending (network-fault tolerant; optional SOCKS5/HTTP proxy)
 - `models.py` — SQLAlchemy database models
 - `database.py` — DB session management
 - `roi.py` — Profit, fee, and ROI calculations
@@ -165,9 +165,18 @@ text
 
 ---
 
+## Notifications
+
+- Telegram notifications are **network-fault tolerant**: configurable timeout, retries with delay, and clear failure logging without blocking the monitor loop
+- Optional **SOCKS5/HTTP proxy** via `TELEGRAM_PROXY_URL` when Telegram is blocked or unstable in the host region
+
+---
+
 ## Security Notes
 
-- **NEVER commit `.env`** — contains Steam session tokens and Telegram credentials
+- **NEVER commit `.env`**
+- `.env` contains Telegram bot credentials and Steam session tokens
+- Proxy credentials may also exist in `.env`
 - Steam cookies expire ~30 days — refresh when 429s or blocks increase
 
 ---
@@ -191,9 +200,20 @@ text
 - **429 Handling:** Bot will wait exponentially (60s, 120s, 180s) and retry on rate limit
 - **Price Source:** Steam API returns median_price for most items, lowest_price rarely. Logic now prioritizes median_price.
 
+### Telegram / connectivity:
+- Telegram may be blocked in some regions
+- Use `TELEGRAM_PROXY_URL` if requests timeout
+- High retry delays can slow notifications
+
 ---
 
 ## Configuration (.env)
+
+**Telegram:**
+- `TELEGRAM_REQUEST_TIMEOUT` — HTTP timeout per Telegram API request (seconds, default 15)
+- `TELEGRAM_PROXY_URL` — Optional SOCKS5/HTTP proxy URL (empty = direct connection)
+- `TELEGRAM_MAX_RETRIES` — Retry count on network errors (default 3)
+- `TELEGRAM_RETRY_DELAY` — Seconds between retry attempts (default 3)
 
 **Steam session (required for Docker):**
 - `STEAM_SESSION_COOKIE` — `sessionid` cookie from steamcommunity.com (browser DevTools → Application → Cookies)
@@ -222,8 +242,12 @@ text
 11. ✅ Steam API headers updated
 12. ✅ Steam cookie authentication for Docker
 13. [ ] Cookie expiry detection — Telegram warning when cookies near expiry
+14. ✅ Telegram timeout fix and proxy support
+15. [ ] Telegram healthcheck endpoint
+16. [ ] Automatic Telegram connectivity test on startup
+17. [ ] Telegram circuit breaker after repeated failures
 
 ---
 
 **Last Updated:** May 25, 2026  
-**Project Phase:** Full Docker deployment, Steam auth via cookies
+**Project Phase:** Full Docker deployment, Steam auth via cookies; Telegram proxy support added; network fault tolerance improved

@@ -1,8 +1,10 @@
 import asyncio
 from pathlib import Path
 
+import httpx
 from telegram import Bot
 from telegram.constants import ParseMode
+from telegram.error import NetworkError, TimedOut
 from telegram.request import HTTPXRequest
 
 from app.config import (
@@ -13,6 +15,7 @@ from app.config import (
     TELEGRAM_MAX_RETRIES,
     TELEGRAM_PROXY_URL,
     TELEGRAM_REQUEST_TIMEOUT,
+    TELEGRAM_RETRY_DELAY,
     telegram_config_status,
 )
 from app.logger import setup_logging
@@ -20,12 +23,47 @@ from app.roi import TradeMetrics
 
 log = setup_logging("notifier")
 
+_bot: Bot | None = None
+_proxy_logged = False
+
+_NETWORK_ERRORS = (
+    NetworkError,
+    TimedOut,
+    httpx.TimeoutException,
+    httpx.NetworkError,
+    httpx.ConnectError,
+    asyncio.TimeoutError,
+    ConnectionError,
+    OSError,
+)
+
 
 def is_telegram_configured() -> bool:
     return telegram_config_status()["ready"]
 
 
-def _build_bot() -> Bot:
+def _proxy_log_label() -> str:
+    if not TELEGRAM_PROXY_URL:
+        return ""
+    if "@" in TELEGRAM_PROXY_URL:
+        return TELEGRAM_PROXY_URL.split("@", 1)[-1]
+    return TELEGRAM_PROXY_URL
+
+
+def _is_network_error(exc: BaseException) -> bool:
+    if isinstance(exc, _NETWORK_ERRORS):
+        return True
+    cause = exc.__cause__
+    if cause is not None and cause is not exc:
+        return _is_network_error(cause)
+    return False
+
+
+def _get_bot() -> Bot:
+    global _bot, _proxy_logged
+    if _bot is not None:
+        return _bot
+
     timeout = TELEGRAM_REQUEST_TIMEOUT
     request = HTTPXRequest(
         connect_timeout=timeout,
@@ -34,9 +72,11 @@ def _build_bot() -> Bot:
         pool_timeout=timeout,
         proxy=TELEGRAM_PROXY_URL,
     )
-    if TELEGRAM_PROXY_URL:
-        log.info("Telegram using proxy: %s", TELEGRAM_PROXY_URL.split("@")[-1])
-    return Bot(token=TELEGRAM_BOT_TOKEN, request=request)
+    if TELEGRAM_PROXY_URL and not _proxy_logged:
+        log.info("Telegram proxy enabled: %s", _proxy_log_label())
+        _proxy_logged = True
+    _bot = Bot(token=TELEGRAM_BOT_TOKEN, request=request)
+    return _bot
 
 
 async def _send_with_retries(send_coro_factory, label: str) -> bool:
@@ -44,14 +84,36 @@ async def _send_with_retries(send_coro_factory, label: str) -> bool:
     for attempt in range(1, TELEGRAM_MAX_RETRIES + 1):
         try:
             msg = await send_coro_factory()
-            log.info("Telegram %s delivered (message_id=%s, attempt=%d)", label, msg.message_id, attempt)
+            log.info(
+                "Telegram %s delivered (message_id=%s, attempt=%d)",
+                label,
+                msg.message_id,
+                attempt,
+            )
             return True
         except Exception as exc:
             last_error = exc
-            log.warning("Telegram %s attempt %d/%d failed: %s", label, attempt, TELEGRAM_MAX_RETRIES, exc)
+            if not _is_network_error(exc):
+                log.error("Telegram %s failed (non-network): %s", label, exc)
+                return False
+            log.warning(
+                "Telegram %s attempt %d/%d failed: %s",
+                label,
+                attempt,
+                TELEGRAM_MAX_RETRIES,
+                exc,
+            )
             if attempt < TELEGRAM_MAX_RETRIES:
-                await asyncio.sleep(2 * attempt)
-    log.error("Telegram %s FAILED after %d attempts: %s", label, TELEGRAM_MAX_RETRIES, last_error)
+                log.info(
+                    "Telegram %s retry %d/%d in %.1fs",
+                    label,
+                    attempt + 1,
+                    TELEGRAM_MAX_RETRIES,
+                    TELEGRAM_RETRY_DELAY,
+                )
+                await asyncio.sleep(TELEGRAM_RETRY_DELAY)
+    log.error("Telegram unreachable — check network/VPN/proxy")
+    log.debug("Telegram %s last error: %s", label, last_error)
     return False
 
 
@@ -127,7 +189,7 @@ def format_sell_closed(trade: dict) -> str:
 
 
 async def _send_message_async(text: str) -> bool:
-    bot = _build_bot()
+    bot = _get_bot()
 
     async def _do_send():
         return await bot.send_message(
@@ -140,7 +202,7 @@ async def _send_message_async(text: str) -> bool:
 
 
 async def _send_photo_async(text: str, chart_path: Path) -> bool:
-    bot = _build_bot()
+    bot = _get_bot()
 
     async def _do_send():
         with chart_path.open("rb") as photo:
