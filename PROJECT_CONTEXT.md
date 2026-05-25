@@ -67,7 +67,8 @@ Build a reliable semi-automated trading tool for the Steam Market that helps gen
 - Advanced signal filters and profit calculation
 - Smart Item management (`items.json` + scoring)
 - ✅ Risk management & position sizing module (`app/risk_manager.py`)
-- Enhanced dashboard with statistics and charts
+- ✅ Professional Monitoring Web Panel (FastAPI + React) — `backend/`, `frontend/`
+- Enhanced Streamlit dashboard with statistics and charts
 - State persistence and graceful shutdown
 
 ---
@@ -84,7 +85,9 @@ Single service, full Docker deployment.
 **Main Components:**
 - `main.py` → Entry point (starts dashboard and/or monitor)
 - `app/` → Core business logic
-- `web/` → Streamlit dashboard
+- `web/` → Streamlit dashboard (legacy)
+- `backend/` → FastAPI monitoring panel API + WebSocket
+- `frontend/` → React + TypeScript monitoring UI (Vite)
 - `data/` → Database, items, logs, charts
 - `charts/` → Generated visualization images
 
@@ -242,12 +245,95 @@ steam-monitor/
 │   └── alert_store.py
 │
 ├── web/
-│   └── dashboard.py                 # Streamlit UI
+│   └── dashboard.py                 # Streamlit UI (legacy)
+│
+├── backend/                         # FastAPI monitoring panel
+│   ├── main.py
+│   ├── deps.py
+│   ├── websocket.py
+│   ├── utils.py
+│   ├── api/router.py
+│   ├── api/endpoints/               # analytics, positions, trades, backtests, system, logs
+│   └── schemas/                     # Pydantic v2 models
+│
+├── frontend/                        # React + TypeScript (Vite)
+│   ├── src/components/              # Dashboard, tables, modal, logs, heat gauge
+│   ├── src/hooks/
+│   ├── src/types/
+│   └── package.json
+│
+├── run_backend.sh / .bat            # Start API on :8000
+├── run_frontend.sh / .bat           # Start UI on :5173
 │
 ├── charts/                          # Generated chart images
 └── logs/
 text
 
+
+---
+
+## Professional Monitoring Web Panel (FastAPI + React)
+
+Standalone dashboard for operators: dark theme, KPI cards, advanced opportunities table, item detail charts, watchlist, positions with heat gauge, trade history + CSV export, backtesting UI, system health and live logs. All data is read from existing `app/*` modules and SQLite (`steam_cards.db`, `price_history.db`) — no duplicate business logic.
+
+**Stack:** FastAPI + WebSocket (`/ws`), React 18 + TypeScript, TanStack Query, Recharts, Tailwind CSS.
+
+**API base:** `http://127.0.0.1:8000/api`  
+**WebSocket:** `ws://127.0.0.1:8000/ws` (15s snapshot push: opportunities, positions, log tail)
+
+| Area | Endpoints |
+|------|-----------|
+| Dashboard KPIs | `GET /api/system/dashboard` |
+| Opportunities | `GET /api/analytics/opportunities` (search, multi-filter, sort, pagination) |
+| Item detail | `GET /api/analytics/items/{name}/detail`, `/history?days=7\|30\|90`, `/risk` |
+| Watchlist | `GET/POST/DELETE /api/analytics/watchlist/{item}` → `data/watchlist.json` |
+| Filter presets | `GET/POST /api/analytics/filter-presets` → `data/filter_presets.json` |
+| Positions | `GET /api/positions`, `GET /api/positions/summary` |
+| Trades | `GET /api/trades`, `GET /api/trades/export` (CSV) |
+| Backtests | `POST /api/backtests/run`, `GET /api/backtests` (history in `data/backtest_history.json`) |
+| System | `GET /api/system/health` |
+| Logs | `GET /api/logs` (tail `logs/monitor.log`) |
+| Actions | `POST /api/analytics/run` (same as monitor analytics cycle) |
+
+### Run instructions (local, uses existing `.env` only)
+
+**1. Install Python deps** (from repo root):
+
+```bash
+pip install -r requirements.txt
+```
+
+**2. Backend** (port 8000):
+
+```bash
+# Linux/macOS
+./run_backend.sh
+
+# Windows
+run_backend.bat
+```
+
+**3. Frontend** (port 5173, proxies `/api` and `/ws` to backend):
+
+```bash
+# Linux/macOS
+./run_frontend.sh
+
+# Windows
+run_frontend.bat
+```
+
+Open **http://localhost:5173**. Ensure `main.py` monitor (or Docker `steam-monitor`) is running so `price_history.db` and `logs/monitor.log` stay fresh.
+
+**Production-style (optional):** build UI then serve from FastAPI:
+
+```bash
+cd frontend && npm run build
+# backend/main.py mounts frontend/dist at / when present
+uvicorn backend.main:app --host 0.0.0.0 --port 8000
+```
+
+**Usability highlights:** global item search; profit/liquidity/volatility/momentum/price filters; column visibility; saved filter presets; row click → modal with 7/30/90d price+volume chart and profit-score breakdown; watchlist tab; portfolio heat gauge; real-time PnL on open positions; dynamic stop-loss display; trade filters + CSV export; backtest form + history; system health indicators; log viewer with pause, level filter, search; refresh 15s / 30s / 60s / manual.
 
 ---
 
@@ -369,4 +455,4 @@ text
 ---
 
 **Last Updated:** May 25, 2026  
-**Project Phase:** Risk management live (`RiskManager`); market intelligence scoring (`MarketAnalytics`); auto-scanner operational; dedicated price history DB; full Docker deployment with Steam cookie auth
+**Project Phase:** Professional FastAPI+React monitoring panel; risk management live (`RiskManager`); market intelligence scoring (`MarketAnalytics`); auto-scanner operational; dedicated price history DB; full Docker deployment with Steam cookie auth
