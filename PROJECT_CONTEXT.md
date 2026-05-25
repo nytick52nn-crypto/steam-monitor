@@ -58,6 +58,8 @@ Build a reliable semi-automated trading tool for the Steam Market that helps gen
 - Telegram notifications with chart images
 - Streamlit dashboard (`web/dashboard.py`)
 - Basic logging and configuration system
+- ✅ Steam API 429 rate limit handling with exponential backoff
+- ✅ RUB currency price parsing (handles '135,00 ₽' and '1 350,00 ₽' formats)
 
 **In Progress / High Priority:**
 - Full implementation of new "High-Quality Rare Trades" strategy
@@ -155,17 +157,41 @@ text
 
 ---
 
+## Known Issues / Fixes (May 2026)
+
+### Fixed Issues:
+- ✅ **Steam API 429 Rate Limiting** — Added exponential backoff handling (wait 60s × attempt number)
+- ✅ **Steam returns None for prices** — Implemented robust RUB price parsing for formats like '135,00 ₽' and '1 350,00 ₽'
+- ✅ **Price parsing** — Handles mixed thousand separators and currency symbols; distinguishes decimal separator intelligently
+
+### Configuration Notes:
+- **STEAM_REQUEST_DELAY_MIN/MAX:** Set to 10–20 seconds to avoid Steam 429 bans
+- **429 Handling:** Bot will wait exponentially (60s, 120s, 180s) and retry on rate limit
+
+---
+
+## Configuration (.env)
+
+**Steam API:**
+- `STEAM_REQUEST_DELAY_MIN=10` — Minimum delay between Steam requests (seconds)
+- `STEAM_REQUEST_DELAY_MAX=20` — Maximum delay between Steam requests (seconds)
+- *Keep 10–20s delays to avoid Steam 429 rate limit bans*
+
+---
+
 ## Next Development Steps (Priority)
 
 1. ~~Update trading strategy with new strict filters (Prompt 1)~~ ✅ Done
 2. ~~Implement full Paper SELL + improved PnL tracking (Prompt 2)~~ ✅ Done
 3. ~~Smart items management + `items.json` (Prompt 3)~~ ✅ Done
-4. Risk management module (`app/risk.py`)
-5. Enhanced dashboard with statistics and indicators
-6. Statistics collection + weekly Telegram reports
-7. State persistence and graceful shutdown
+4. ✅ Steam API price parsing for RUB currency
+5. ✅ Steam 429 rate limit handling with backoff
+6. Risk management module (`app/risk.py`)
+7. Enhanced dashboard with statistics and indicators
+8. Statistics collection + weekly Telegram reports
+9. State persistence and graceful shutdown
 
 ---
 
-**Last Updated:** May 22, 2026  
-**Project Phase:** Smart Items Management (Prompts 1–3 implemented)
+**Last Updated:** May 25, 2026  
+**Project Phase:** Steam API fixed, price parsing working
