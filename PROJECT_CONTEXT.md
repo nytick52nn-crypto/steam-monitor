@@ -75,12 +75,35 @@ Build a reliable semi-automated trading tool for the Steam Market that helps gen
 
 ## Architecture Overview
 
-### Docker
+### Docker (Multi-Container)
 
-Single service, full Docker deployment.
+Four‑service Docker Compose stack managed from a single command:
 
-- `steam-monitor`: builds from `Dockerfile`, runs `main.py` (dashboard + monitor), published on `8501:8501`, shared volumes for `data/`, `logs/`, `charts/`.
+| Service          | Container              | Dockerfile            | Port(s)  | Purpose                      |
+|------------------|------------------------|-----------------------|----------|------------------------------|
+| `steam-monitor`  | `steam-monitor`        | `Dockerfile`          | —        | Main Python monitor loop     |
+| `backend`        | `steam-monitor-backend`| `Dockerfile.backend`  | `8000`   | FastAPI + WebSocket API      |
+| `frontend`       | `steam-monitor-frontend`| `Dockerfile.frontend`| `5173:80`| React SPA served by Nginx    |
+
+- All services share the same `.env` file.
+- Frontend proxies `/api` and `/ws` to the backend via Nginx.
+- Persistent named volumes for `data/` and `logs/`.
+- Healthchecks on backend and frontend.
 - Steam IP blocks solved via session cookie authentication (`STEAM_SESSION_COOKIE`, `STEAM_LOGIN_SECURE` in `.env`).
+
+**Docker Deployment Commands:**
+```bash
+# Build and start all services in detached mode
+docker-compose up -d --build
+
+# Follow logs for a specific service (e.g., steam-monitor)
+docker-compose logs -f steam-monitor
+
+# Stop and remove all containers
+docker-compose down
+```
+
+**Open** http://localhost:5173 to access the monitoring panel.
 
 **Main Components:**
 - `main.py` → Entry point (starts dashboard and/or monitor)
@@ -210,8 +233,11 @@ Separate from the main SQLAlchemy DB (`data/steam_cards.db`), the monitor writes
 
 steam-monitor/
 ├── main.py                          # Entry point
-├── Dockerfile
-├── docker-compose.yml
+├── Dockerfile                       # Monitor container
+├── Dockerfile.backend               # FastAPI container
+├── Dockerfile.frontend              # React + Nginx container
+├── docker-compose.yml               # 4-service stack
+├── nginx.conf                       # Frontend reverse proxy config
 ├── requirements.txt
 ├── .env.example
 ├── PROJECT_CONTEXT.md
@@ -454,5 +480,5 @@ uvicorn backend.main:app --host 0.0.0.0 --port 8000
 
 ---
 
-**Last Updated:** May 25, 2026  
+**Last Updated:** May 25, 2026 (Docker multi-container setup updated)  
 **Project Phase:** Professional FastAPI+React monitoring panel; risk management live (`RiskManager`); market intelligence scoring (`MarketAnalytics`); auto-scanner operational; dedicated price history DB; full Docker deployment with Steam cookie auth
