@@ -60,6 +60,7 @@ Build a reliable semi-automated trading tool for the Steam Market that helps gen
 - Basic logging and configuration system
 - ✅ Steam API 429 rate limit handling with exponential backoff
 - ✅ RUB currency price parsing (handles '135,00 ₽' and '1 350,00 ₽' formats)
+- ✅ median_price as primary source, lowest_price as fallback (most items have only median)
 
 **In Progress / High Priority:**
 - Full implementation of new "High-Quality Rare Trades" strategy
@@ -163,10 +164,12 @@ text
 - ✅ **Steam API 429 Rate Limiting** — Added exponential backoff handling (wait 60s × attempt number)
 - ✅ **Steam returns None for prices** — Implemented robust RUB price parsing for formats like '135,00 ₽' and '1 350,00 ₽'
 - ✅ **Price parsing** — Handles mixed thousand separators and currency symbols; distinguishes decimal separator intelligently
+- ✅ **Most items return only median_price** — Switched to median_price as primary, lowest_price as fallback (real API behavior)
 
 ### Configuration Notes:
 - **STEAM_REQUEST_DELAY_MIN/MAX:** Set to 10–20 seconds to avoid Steam 429 bans
 - **429 Handling:** Bot will wait exponentially (60s, 120s, 180s) and retry on rate limit
+- **Price Source:** Steam API returns median_price for most items, lowest_price rarely. Logic now prioritizes median_price.
 
 ---
 

@@ -130,11 +130,13 @@ def get_priceoverview(market_hash_name: str, retries: int = 2) -> dict | None:
             volume = _parse_volume(data.get("volume"))
 
             log.info(
-                "Price fetched: %s -> lowest=%.2f median=%.2f volume=%s",
+                "Price fetched: %s -> lowest=%s median=%s volume=%s (raw: %s / %s)",
                 market_hash_name,
-                lowest or 0,
-                median or 0,
+                f"{lowest:.2f}" if lowest else "None",
+                f"{median:.2f}" if median else "None",
                 volume,
+                data.get("lowest_price_raw") or data.get("lowest_price"),
+                data.get("median_price_raw") or data.get("median_price"),
             )
 
             # Delay between requests to avoid ban

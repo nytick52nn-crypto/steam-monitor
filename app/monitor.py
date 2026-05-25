@@ -121,7 +121,7 @@ def process_item(item: dict) -> bool:
         log.warning("No data returned for: %s", item_name)
         return False
 
-    lowest_price = data.get("lowest_price") or data.get("median_price")
+    lowest_price = data.get("median_price") or data.get("lowest_price")
     if not lowest_price:
         log.warning("No price in response for: %s | data=%s", item_name, data)
         return False

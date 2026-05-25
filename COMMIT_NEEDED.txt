@@ -1,0 +1,38 @@
+COMMIT DETAILS
+==============
+
+Subject: fix: use median_price as primary price source, lowest_price as fallback
+
+Body:
+Steam API returns median_price for most items but rarely returns lowest_price. 
+Updated monitor.py to prioritize median_price over lowest_price to capture more 
+items in each scan cycle.
+
+Enhanced steam_api.py logging to show both raw price values for better debugging.
+
+Updated PROJECT_CONTEXT.md to document this behavior and mark issue as fixed.
+
+Files Changed:
+- app/monitor.py (line 124): Changed price priority logic
+- app/steam_api.py (lines 132-140): Enhanced logging with raw price strings
+- PROJECT_CONTEXT.md: Updated documentation
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+CHANGES SUMMARY
+===============
+
+app/monitor.py:
+  Line 124: 
+    OLD: lowest_price = data.get("lowest_price") or data.get("median_price")
+    NEW: lowest_price = data.get("median_price") or data.get("lowest_price")
+    
+app/steam_api.py:
+  Lines 132-140:
+    OLD: log.info("Price fetched: %s -> lowest=%.2f median=%.2f volume=%s", ...)
+    NEW: log.info("Price fetched: %s -> lowest=%s median=%s volume=%s (raw: %s / %s)", ...)
+         Now includes raw price strings in log output
+         
+PROJECT_CONTEXT.md:
+  - Added median_price priority to Completed section
+  - Added detailed note in Known Issues about price source preference
