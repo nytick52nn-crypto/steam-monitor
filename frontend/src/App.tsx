@@ -6,11 +6,10 @@ import {
   LayoutDashboard,
   LineChart,
   RefreshCw,
-  ScrollText,
   Settings,
   Wallet,
 } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useState, type ComponentType } from "react";
 import { BacktestPanel } from "./components/BacktestPanel";
 import { DashboardCards } from "./components/DashboardCards";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -41,7 +40,7 @@ const defaultFilters: OpportunityFilters = {
   price_max: "",
 };
 
-const TABS: { id: TabId; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+const TABS: { id: TabId; label: string; icon: ComponentType<{ className?: string }> }[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "opportunities", label: "Opportunities", icon: TargetIcon },
   { id: "watchlist", label: "Watchlist", icon: Bookmark },

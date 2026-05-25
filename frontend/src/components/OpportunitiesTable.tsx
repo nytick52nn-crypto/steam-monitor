@@ -200,7 +200,7 @@ export function OpportunitiesTable({
                           : "—"
                       ) : (
                         String(
-                          (row as Record<string, unknown>)[c.key] ?? "—"
+                          (row as unknown as Record<string, unknown>)[c.key] ?? "—"
                         )
                       )}
                     </td>

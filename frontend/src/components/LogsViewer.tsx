@@ -1,5 +1,4 @@
 import { Pause, Play, Search } from "lucide-react";
-import { useState } from "react";
 import type { LogEntry } from "../types";
 import { Button } from "./ui/Button";
 import { Card } from "./ui/Card";
