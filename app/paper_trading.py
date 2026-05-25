@@ -1,6 +1,6 @@
 """Paper BUY & SELL execution: open positions backed by the virtual wallet."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
@@ -157,7 +157,7 @@ def execute_paper_buy(
             cost=cost,
             status=POSITION_STATUS_OPEN,
             signal="BUY",
-            opened_at=datetime.utcnow(),
+            opened_at=datetime.now(timezone.utc),
         )
         db.add(position)
         db.commit()
@@ -221,7 +221,7 @@ def execute_paper_sell(item_name: str, current_price: float, session: Session | 
 
         position.status = POSITION_STATUS_CLOSED
         position.exit_price = current_price
-        position.closed_at = datetime.utcnow()
+        position.closed_at = datetime.now(timezone.utc)
         position.pnl_rub = pnl_rub
         position.pnl_pct = pnl_pct
 

@@ -66,7 +66,7 @@ Build a reliable semi-automated trading tool for the Steam Market that helps gen
 - Full implementation of new "High-Quality Rare Trades" strategy
 - Advanced signal filters and profit calculation
 - Smart Item management (`items.json` + scoring)
-- Risk management & position sizing module
+- ✅ Risk management & position sizing module (`app/risk_manager.py`)
 - Enhanced dashboard with statistics and charts
 - State persistence and graceful shutdown
 
@@ -103,6 +103,44 @@ Single service, full Docker deployment.
 - `roi.py` — Profit, fee, and ROI calculations
 - `history.py` — Dedicated SQLite price snapshot store (`data/price_history.db`) for analytics and trend detection
 - `analytics.py` — Read-only profitability scoring engine (`MarketAnalytics`) over price history DB; no Steam/network calls
+- `risk_manager.py` — Position sizing, portfolio heat limits, and trade approval gates (`RiskManager`)
+- `backtester.py` — Historical walk-forward simulation with risk-managed sizing
+
+---
+
+## Risk Management System
+
+`RiskManager` (`app/risk_manager.py`) enforces capital preservation rules before paper BUY execution and during backtests.
+
+**Position sizing (`calculate_position_size`):**
+- Base budget per trade: `account_balance × MAX_RISK_PER_TRADE` (default **1.5%**)
+- **Higher `profit_score`** → larger multiplier (0.5×–1.0× on the risk budget)
+- **Higher volatility risk** (price CV mapped 0–100) → smaller multiplier (down to 0.25×)
+- Optional global scale via `POSITION_SCALING_FACTOR`
+- Returns **0** when balance invalid or size below minimum (1 ₽)
+
+**Portfolio heat (`check_portfolio_heat`):**
+- Sum of open position `cost` values divided by balance must stay ≤ `MAX_PORTFOLIO_HEAT` (default **30%**)
+- `is_trade_allowed` also rejects a new BUY if it would push heat over the limit
+
+**Trade gate (`is_trade_allowed`):**
+- Requires `profit_score ≥ MIN_PROFIT_SCORE_ALERT` when a score is available (≥ 0)
+- Validates balance, heat headroom, and non-zero position size
+- Returns `(bool, reason)` — never raises on missing data
+
+**Dynamic stop loss (`calculate_dynamic_stop_loss`):**
+- Stop price below entry; distance scales with volatility (base ~8%, up to ~25%)
+
+**Integration:**
+- `monitor.py` — risk pre-check logging before `evaluate_and_notify`
+- `signals.py` — blocks BUY → `HOLD` when risk fails; sizes paper quantity from `calculate_position_size`
+- `backtester.py` — applies the same gates and stop-loss exits during simulation
+
+| Setting | Default | Purpose |
+|---------|---------|---------|
+| `MAX_RISK_PER_TRADE` | `0.015` | Max fraction of balance risked per new position |
+| `MAX_PORTFOLIO_HEAT` | `0.30` | Max fraction of balance in open positions |
+| `POSITION_SCALING_FACTOR` | `1.0` | Global multiplier on computed position size |
 
 ---
 
@@ -199,6 +237,8 @@ steam-monitor/
 │   ├── roi.py
 │   ├── history.py
 │   ├── analytics.py
+│   ├── risk_manager.py
+│   ├── backtester.py
 │   └── alert_store.py
 │
 ├── web/
@@ -293,6 +333,11 @@ text
 - `ANALYTICS_LOOKBACK_HOURS` — Lookback window for analytics queries (default 24)
 - `MIN_PROFIT_SCORE_ALERT` — Telegram alert when profit score reaches this level (default 70)
 
+**Risk management:**
+- `MAX_RISK_PER_TRADE` — Max balance fraction per new position (default 0.015 = 1.5%)
+- `MAX_PORTFOLIO_HEAT` — Max balance fraction in open positions (default 0.30)
+- `POSITION_SCALING_FACTOR` — Global position size multiplier (default 1.0)
+
 ---
 
 ## Next Development Steps (Priority)
@@ -302,7 +347,7 @@ text
 3. ~~Smart items management + `items.json` (Prompt 3)~~ ✅ Done
 4. ✅ Steam API price parsing for RUB currency
 5. ✅ Steam 429 rate limit handling with backoff
-6. Risk management module (`app/risk.py`)
+6. ~~Risk management module (`app/risk_manager.py`)~~ ✅ Done
 7. Enhanced dashboard with statistics and indicators
 8. Statistics collection + weekly Telegram reports
 9. State persistence and graceful shutdown
@@ -324,4 +369,4 @@ text
 ---
 
 **Last Updated:** May 25, 2026  
-**Project Phase:** Market intelligence scoring live (`MarketAnalytics`); auto-scanner operational; dedicated price history DB; full Docker deployment with Steam cookie auth
+**Project Phase:** Risk management live (`RiskManager`); market intelligence scoring (`MarketAnalytics`); auto-scanner operational; dedicated price history DB; full Docker deployment with Steam cookie auth

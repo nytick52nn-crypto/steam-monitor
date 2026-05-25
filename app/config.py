@@ -157,3 +157,8 @@ ANALYTICS_LOOKBACK_HOURS = int(
 MIN_PROFIT_SCORE_ALERT = float(
     os.getenv("MIN_PROFIT_SCORE_ALERT", "70")
 )
+
+# --- Risk management ---
+MAX_RISK_PER_TRADE = float(os.getenv("MAX_RISK_PER_TRADE", "0.015"))
+MAX_PORTFOLIO_HEAT = float(os.getenv("MAX_PORTFOLIO_HEAT", "0.30"))
+POSITION_SCALING_FACTOR = float(os.getenv("POSITION_SCALING_FACTOR", "1.0"))

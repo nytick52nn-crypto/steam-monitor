@@ -294,8 +294,10 @@ class MarketAnalytics:
         finally:
             conn.close()
 
-    def get_top_opportunities(self, limit: int = 10) -> list[dict]:
-        """Rank items by profit score; ignores low-history items."""
+    def get_top_opportunities(
+        self, limit: int = 10, min_score: float = 0.0
+    ) -> list[dict]:
+        """Rank items by profit score; ignores low-history and below min_score."""
         candidates = self._eligible_item_names()
         if not candidates:
             return []
@@ -304,7 +306,7 @@ class MarketAnalytics:
         for name in candidates:
             try:
                 row = self.calculate_profit_score(name)
-                if row is not None:
+                if row is not None and row["profit_score"] >= min_score:
                     scored.append(row)
             except Exception as exc:
                 log.debug("profit score skipped for %s: %s", name, exc)

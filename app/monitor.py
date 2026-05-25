@@ -10,10 +10,14 @@ from app.database import SessionLocal
 from app.history import init_db, save_bulk_snapshots
 from app.logger import setup_logging
 from app.models import PriceHistory
+from app.risk_manager import RiskManager
 from app.signals import evaluate_and_notify
 from app.steam_api import get_priceoverview
+from app.wallet import get_balance
 
 log = setup_logging("monitor")
+
+_risk_manager = RiskManager()
 
 FALLBACK_ITEMS = [
     {"name": "Fracture Case", "hash_name": "Fracture%20Case", "enabled": True, "priority": 1},
@@ -112,6 +116,37 @@ def save_price(item_name: str, price: float, volume: int) -> bool:
             db.close()
 
 
+def _check_risk_before_signal(item_name: str, current_price: float) -> None:
+    """Log risk context before signal evaluation (never raises)."""
+    try:
+        from app.paper_trading import get_open_positions
+
+        balance = get_balance()
+        open_positions = get_open_positions()
+        metrics = _risk_manager.get_item_risk_metrics(item_name)
+        profit_score = metrics["profit_score"]
+        if profit_score < 0:
+            profit_score = 0.0
+        allowed, reason = _risk_manager.is_trade_allowed(
+            item_name,
+            profit_score,
+            metrics["volatility_risk"],
+            balance,
+            open_positions,
+        )
+        heat = _risk_manager.portfolio_heat_ratio(open_positions, balance)
+        log.debug(
+            "Risk pre-check %s @ %.2f: allowed=%s heat=%.1f%% reason=%s",
+            item_name,
+            current_price,
+            allowed,
+            heat * 100,
+            reason,
+        )
+    except Exception as exc:
+        log.debug("Risk pre-check skipped for %s: %s", item_name, exc)
+
+
 def process_item(item: dict) -> tuple[bool, dict | None]:
     item_name = item["name"]
     hash_name = item.get("hash_name", item_name)
@@ -143,6 +178,7 @@ def process_item(item: dict) -> tuple[bool, dict | None]:
     if saved:
         median_raw = data.get("median_price")
         median_price = parse_price(median_raw) if median_raw else None
+        _check_risk_before_signal(item_name, price)
         signal = evaluate_and_notify(
             item_name=item_name,
             current_price=price,
